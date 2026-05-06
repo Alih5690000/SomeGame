@@ -1,7 +1,7 @@
 #include "Location.h"
 #include <algorithm>
 
-Location::Location() {
+Location::Location() : currentRoom(nullptr) {
 }
 
 Location::~Location() {
@@ -33,4 +33,18 @@ Room* Location::getRoom(size_t index) {
 
 size_t Location::getRoomCount() const {
     return rooms.size();
+}
+
+void Location::setCurrentRoom(Room* room) {
+    currentRoom = room;
+}
+
+Room* Location::getCurrentRoom() {
+    return currentRoom;
+}
+
+void Location::update(SDL_Renderer* renderer, float deltaTime) {
+    if (currentRoom != nullptr) {
+        currentRoom->update(renderer, deltaTime);
+    }
 }
