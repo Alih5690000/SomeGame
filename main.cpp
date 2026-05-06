@@ -2,10 +2,117 @@
 #include <SDL2/SDL.h>
 #include <emscripten.h>
 #include <emscripten/html5.h>
+#include <vector>
 
 SDL_Window* window = nullptr;
 SDL_Renderer* renderer = nullptr;
 bool running = true;
+
+class Sprite{
+    public:
+    SDL_FRect rect;
+    SDL_Texture* txt;
+    float* gravity;
+    bool collidable=true;
+    float dx,dy;
+    float weight=1.f;
+    std::vector<Sprite*> sprites;
+    virtual void update(SDL_Renderer*,float dt){}
+    void render(SDL_Renderer* r){
+        SDL_RenderCopyF(r,txt,nullptr,&rect);
+    }
+    virtual ~Sprite()=default;
+    Sprite(float* gravity,std::vector<Sprite*> s):
+        gravity(gravity),sprites(s){}
+    void MoveAndHandleX(float dt){
+        rect.x+=dx*dt;
+        for (auto i:sprites){
+            if (i==this) continue;
+            if (SDL_HasIntersectionF(&rect,&i->rect)){
+                if (collidable&&i->collidable){
+                    if (dx>0){
+                        if (weight>i->weight){
+                            i->rect.x=rect.x+rect.w;
+                        }
+                        else{
+                            rect.x=i->rect.x+rect.w;
+                        }
+                    }
+                    else{
+                        if (weight>i->weight){
+                            i->rect.x=rect.x-rect.w;
+                        }
+                        else{
+                            rect.x=i->rect.x-rect.w;
+                        }
+                    }
+                    dx=0;
+                }
+            }
+        }
+    }
+    void MoveAndHandleY(float dt){
+        rect.y+=dy*dt;
+        for (auto i:sprites){
+            if (i==this) continue;
+            if (SDL_HasIntersectionF(&rect,&i->rect)){
+                if (collidable&&i->collidable){
+                    if (dy>0){
+                        if (weight>i->weight){
+                            i->rect.y=rect.y+rect.h;
+                        }
+                        else{
+                            rect.y=i->rect.y+rect.h;
+                        }
+                    }
+                    else{
+                        if (weight>i->weight){
+                            i->rect.y=rect.y-rect.h;
+                        }
+                        else{
+                            rect.y=i->rect.y-rect.h;
+                        }
+                    }
+                    dy=0;
+                }
+            }
+        }
+    }
+};
+
+class Player:public Sprite{
+    Player(float* gravity,std::vector<Sprite*> s):Sprite(gravity,s){
+        rect={100,100,50,50};
+        txt=SDL_CreateTexture(renderer,SDL_PIXELFORMAT_RGBA8888,SDL_TEXTUREACCESS_TARGET,50,50);
+        SDL_Texture* prev=SDL_GetRenderTarget(renderer);
+        SDL_SetRenderTarget(renderer,txt);  
+        SDL_SetRenderDrawColor(renderer,255,0,0,255);
+        SDL_RenderClear(renderer);
+        SDL_SetRenderTarget(renderer,prev);
+    }
+    void update(SDL_Renderer* r,float dt) override{
+        const Uint8* state=SDL_GetKeyboardState(NULL);
+        if (state[SDL_SCANCODE_A]){
+            dx=-200;
+        }
+        else if (state[SDL_SCANCODE_D]){
+            dx=200;
+        }
+        else{
+            dx=0;
+        }
+        if (state[SDL_SCANCODE_SPACE]&&dy==0){
+            dy=-500;
+        }
+        dy+=*gravity*dt;
+        MoveAndHandleX(dt);
+        MoveAndHandleY(dt);
+        render(r);
+    }
+    ~Player(){
+        SDL_DestroyTexture(txt);
+    }
+};
 
 void update() {
     SDL_Event event;
@@ -27,7 +134,7 @@ void update() {
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
     SDL_RenderClear(renderer);
 
-    // Render here
+    
 
     SDL_RenderPresent(renderer);
 }
