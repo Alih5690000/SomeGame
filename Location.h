@@ -14,9 +14,14 @@ public:
     std::vector<Room*>& getRooms();
     Room* getRoom(size_t index);
     size_t getRoomCount() const;
+    
+    void setCurrentRoom(Room* room);
+    Room* getCurrentRoom();
+    void update(SDL_Renderer* renderer, float deltaTime);
 
 private:
     std::vector<Room*> rooms;
+    Room* currentRoom;
 };
 
 #endif // LOCATION_H
