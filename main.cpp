@@ -18,6 +18,7 @@ class Sprite{
     SDL_Texture* txt;
     float* gravity;
     bool collidable=true;
+    bool active=true;
     float dx,dy;
     float weight=1.f;
     std::vector<Sprite*>& sprites;
@@ -51,7 +52,7 @@ class Sprite{
                         }
                     }
                     if (dx>0){
-                        dx-=500*dt;
+                        dx-=10000*dt;
                         if (dx<0) dx=0;
                     }
                     else if (dx<0){
@@ -140,8 +141,7 @@ class Sword:public Weapon{
                 Sprite* i=w->owner->sprites[j];
                 if (i!=w->owner){
                     if (SDL_HasIntersectionF(&w->owner->rect,&hitRect)){
-                        w->owner->sprites.erase(w->owner->sprites.begin()+j);
-                        delete i;
+                        i->active=false;
                     }
                 }
             }
@@ -269,6 +269,13 @@ void update() {
 
     for (auto sprite : sprites) {
         sprite->update(renderer, dt);
+    }
+
+    for (int i=sprites.size()-1;i>=0;i--){
+        if (!sprites[i]->active){
+            delete sprites[i];
+            sprites.erase(sprites.begin()+i);
+        }
     }
 
     SDL_RenderPresent(renderer);
