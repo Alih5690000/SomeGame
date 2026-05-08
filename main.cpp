@@ -50,7 +50,14 @@ class Sprite{
                             rect.x=i->rect.x+rect.w;
                         }
                     }
-                    dx-=200*dt;
+                    if (dx>0){
+                        dx-=500*dt;
+                        if (dx<0) dx=0;
+                    }
+                    else if (dx<0){
+                        dx+=500*dt;
+                        if (dx>0) dx=0;
+                    }
                 }
             }
         }
@@ -129,11 +136,11 @@ class Sword:public Weapon{
             if (wep->cd>0) return;
             SDL_FRect hitRect={w->owner->rect.x,w->owner->rect.y,
                 w->owner->rect.w*2,w->owner->rect.h};
-            for (int j=sprites.size()-1;j>=0;j--){
-                Sprite* i=sprites[j];
+            for (int j=w->owner->sprites.size()-1;j>=0;j--){
+                Sprite* i=w->owner->sprites[j];
                 if (i!=w->owner){
                     if (SDL_HasIntersectionF(&w->owner->rect,&hitRect)){
-                        sprites.erase(sprites.begin()+j);
+                        w->owner->sprites.erase(w->owner->sprites.begin()+j);
                         delete i;
                     }
                 }
@@ -198,16 +205,14 @@ class Player:public Sprite{
     void update(SDL_Renderer* r,float dt) override{
         const Uint8* state=SDL_GetKeyboardState(NULL);
         if (state[SDL_SCANCODE_A]){
-            dx=-200;
+            if (dx>-200)
+                dx=-200;
         }
         else if (state[SDL_SCANCODE_D]){
-            dx=200;
+            if (dx<200)
+                dx=200;
         }
-        else{
-            dx=0;
-        }
-        if (state[SDL_SCANCODE_SPACE]&&dy==0){
-            dy=-500;
+        if (state[SDL_SCANCODE_SPACE] && dy==0){
         }
         if (state[SDL_SCANCODE_F]){
             if (weapon) weapon->Use();
@@ -304,6 +309,7 @@ int main() {
     }
 
     Player* p=new Player(&gravity,sprites);
+    p->weapon=new Sword(p,[](Weapon*){});
     sprites.push_back(p);
     sprites.push_back(new Brick(&gravity,sprites));
 
