@@ -213,6 +213,7 @@ class Player:public Sprite{
                 dx=200;
         }
         if (state[SDL_SCANCODE_SPACE] && dy==0){
+            dy=100;
         }
         if (state[SDL_SCANCODE_F]){
             if (weapon) weapon->Use();
