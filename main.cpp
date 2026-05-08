@@ -4,6 +4,9 @@
 #include <emscripten/html5.h>
 #include <vector>
 #include <functional>
+#include <map>
+#include <any>
+#include <cmath>
 
 SDL_Window* window = nullptr;
 SDL_Renderer* renderer = nullptr;
@@ -47,7 +50,7 @@ class Sprite{
                             rect.x=i->rect.x+rect.w;
                         }
                     }
-                    dx=0;
+                    dx-=200*dt;
                 }
             }
         }
@@ -82,18 +85,86 @@ class Sprite{
 };
 
 class Weapon{
+    public:
     Sprite* owner;
     std::function<void(Weapon*)> onUse;
+    std::function<void(Weapon*)> onAltUse;
     std::function<void(Weapon*)> reload;
-    public:
-    Weapon(Sprite* owner,std::function<void(Weapon*)> onUse,std::function<void(Weapon*)> reload):
-        owner(owner),onUse(onUse),reload(reload){}
+    std::function<void(Weapon*)> draw;
+    std::function<void(Weapon*,float)> update;
+    Weapon(Sprite* owner,std::function<void(Weapon*)> onUse,
+        std::function<void(Weapon*)> onAltUse,
+        std::function<void(Weapon*)> reload,
+        std::function<void(Weapon*)> draw,
+        std::function<void(Weapon*,float)> update):
+            owner(owner),onUse(onUse),onAltUse(onAltUse),reload(reload),draw(draw),update(update){}
+    virtual ~Weapon()=default;
     void Use(){
         onUse(this);
+    }
+    void Draw(){
+        draw(this);
+    }
+    void AltUse(){
+        onAltUse(this);
+    }
+    void Update(float dt){
+        update(this,dt);
     }
     void Reload(){
         reload(this);
     }
+};
+
+class Sword:public Weapon{
+    public:
+    float cd=0.f;
+    float maxCd=0.5f;
+    float swordLength=40.f;
+    float swordWidth=10.f;
+    
+    Sword(Sprite* o,std::function<void(Weapon*)> draw):Weapon(o,
+        [](Weapon* w){
+            Sword* wep=dynamic_cast<Sword*>(w);
+            if (wep->cd>0) return;
+            SDL_FRect hitRect={w->owner->rect.x,w->owner->rect.y,
+                w->owner->rect.w*2,w->owner->rect.h};
+            for (int j=sprites.size()-1;j>=0;j--){
+                Sprite* i=sprites[j];
+                if (i!=w->owner){
+                    if (SDL_HasIntersectionF(&w->owner->rect,&hitRect)){
+                        sprites.erase(sprites.begin()+j);
+                        delete i;
+                    }
+                }
+            }
+            w->owner->dx+=200;
+            wep->cd=wep->maxCd;
+        },
+        [](Weapon* w){}
+        ,[](Weapon* w){}
+        ,[](Weapon* w){
+            Sword* wep=dynamic_cast<Sword*>(w);
+            float angle=0.f;
+            if (wep->cd>0){
+                angle=360.f*(1.f-wep->cd/wep->maxCd);
+            }
+            float radians=angle*3.14159f/180.f;
+            float sx=w->owner->rect.x+w->owner->rect.w/2.f;
+            float sy=w->owner->rect.y+w->owner->rect.h/2.f;
+            float ex=sx+cosf(radians)*wep->swordLength;
+            float ey=sy+sinf(radians)*wep->swordLength;
+            SDL_SetRenderDrawColor(renderer,255,255,0,255);
+            SDL_RenderDrawLineF(renderer,sx,sy,ex,ey);
+        },
+        [](Weapon* w,float dt){
+            Sword* wep=dynamic_cast<Sword*>(w);
+            wep->cd-=dt;
+            wep->cd=std::max(wep->cd,0.f);
+        }
+    ){
+    }
+    ~Sword()=default;
 };
 
 class Brick:public Sprite{
@@ -114,6 +185,7 @@ class Brick:public Sprite{
 
 class Player:public Sprite{
     public:
+    Weapon* weapon;
     Player(float* gravity,std::vector<Sprite*>& s):Sprite(gravity,s){
         rect={100,100,50,50};
         txt=SDL_CreateTexture(renderer,SDL_PIXELFORMAT_RGBA8888,SDL_TEXTUREACCESS_TARGET,50,50);
@@ -137,6 +209,16 @@ class Player:public Sprite{
         if (state[SDL_SCANCODE_SPACE]&&dy==0){
             dy=-500;
         }
+        if (state[SDL_SCANCODE_F]){
+            if (weapon) weapon->Use();
+        }
+        if (state[SDL_SCANCODE_G]){
+            if (weapon) weapon->AltUse();
+        }
+        if (state[SDL_SCANCODE_R]){
+            if (weapon) weapon->Reload();
+        }
+        weapon->Draw();
         dy+=*gravity*dt;
         MoveAndHandleX(dt);
         MoveAndHandleY(dt);
@@ -221,7 +303,8 @@ int main() {
         return 1;
     }
 
-    sprites.push_back(new Player(&gravity,sprites));
+    Player* p=new Player(&gravity,sprites);
+    sprites.push_back(p);
     sprites.push_back(new Brick(&gravity,sprites));
 
     emscripten_set_main_loop(update, 0, 1);
