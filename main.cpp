@@ -3,6 +3,7 @@
 #include <emscripten.h>
 #include <emscripten/html5.h>
 #include <vector>
+#include <functional>
 
 SDL_Window* window = nullptr;
 SDL_Renderer* renderer = nullptr;
@@ -16,13 +17,13 @@ class Sprite{
     bool collidable=true;
     float dx,dy;
     float weight=1.f;
-    std::vector<Sprite*> sprites;
+    std::vector<Sprite*>& sprites;
     virtual void update(SDL_Renderer*,float dt){}
     void render(SDL_Renderer* r){
         SDL_RenderCopyF(r,txt,nullptr,&rect);
     }
     virtual ~Sprite()=default;
-    Sprite(float* gravity,std::vector<Sprite*> s):
+    Sprite(float* gravity,std::vector<Sprite*>& s):
         gravity(gravity),sprites(s){}
     void MoveAndHandleX(float dt){
         rect.x+=dx*dt;
@@ -35,7 +36,7 @@ class Sprite{
                             i->rect.x=rect.x+rect.w;
                         }
                         else{
-                            rect.x=i->rect.x+rect.w;
+                            rect.x=i->rect.x-rect.w;
                         }
                     }
                     else{
@@ -43,7 +44,7 @@ class Sprite{
                             i->rect.x=rect.x-rect.w;
                         }
                         else{
-                            rect.x=i->rect.x-rect.w;
+                            rect.x=i->rect.x+rect.w;
                         }
                     }
                     dx=0;
@@ -62,7 +63,7 @@ class Sprite{
                             i->rect.y=rect.y+rect.h;
                         }
                         else{
-                            rect.y=i->rect.y+rect.h;
+                            rect.y=i->rect.y-rect.h;
                         }
                     }
                     else{
@@ -70,7 +71,7 @@ class Sprite{
                             i->rect.y=rect.y-rect.h;
                         }
                         else{
-                            rect.y=i->rect.y-rect.h;
+                            rect.y=i->rect.y+rect.h;
                         }
                     }
                     dy=0;
@@ -80,8 +81,40 @@ class Sprite{
     }
 };
 
+class Weapon{
+    Sprite* owner;
+    std::function<void(Weapon*)> onUse;
+    std::function<void(Weapon*)> reload;
+    public:
+    Weapon(Sprite* owner,std::function<void(Weapon*)> onUse,std::function<void(Weapon*)> reload):
+        owner(owner),onUse(onUse),reload(reload){}
+    void Use(){
+        onUse(this);
+    }
+    void Reload(){
+        reload(this);
+    }
+};
+
+class Brick:public Sprite{
+    public:
+    Brick(float* gravity,std::vector<Sprite*>& s):Sprite(gravity,s){
+        rect={200,200,50,50};
+        txt=SDL_CreateTexture(renderer,SDL_PIXELFORMAT_RGBA8888,SDL_TEXTUREACCESS_TARGET,50,50);
+        SDL_Texture* prev=SDL_GetRenderTarget(renderer);
+        SDL_SetRenderTarget(renderer,txt);  
+        SDL_SetRenderDrawColor(renderer,0,255,0,255);
+        SDL_RenderClear(renderer);
+        SDL_SetRenderTarget(renderer,prev);
+    }
+    void update(SDL_Renderer* r,float dt) override{
+        render(r);
+    }
+};
+
 class Player:public Sprite{
-    Player(float* gravity,std::vector<Sprite*> s):Sprite(gravity,s){
+    public:
+    Player(float* gravity,std::vector<Sprite*>& s):Sprite(gravity,s){
         rect={100,100,50,50};
         txt=SDL_CreateTexture(renderer,SDL_PIXELFORMAT_RGBA8888,SDL_TEXTUREACCESS_TARGET,50,50);
         SDL_Texture* prev=SDL_GetRenderTarget(renderer);
@@ -114,7 +147,20 @@ class Player:public Sprite{
     }
 };
 
+std::vector<Sprite*> sprites;
+float gravity=100.f;
+float dt=0.f;
+int start,end;
+
+void HandleDeltaTime(){
+    start=SDL_GetTicks();
+    dt=(start-end)/1000.f;
+    end=start;
+    dt=SDL_min(dt,0.033f);
+}
+
 void update() {
+    HandleDeltaTime();
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
         switch (event.type) {
@@ -134,7 +180,9 @@ void update() {
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
     SDL_RenderClear(renderer);
 
-    
+    for (auto sprite : sprites) {
+        sprite->update(renderer, dt);
+    }
 
     SDL_RenderPresent(renderer);
 }
@@ -172,6 +220,9 @@ int main() {
         SDL_Quit();
         return 1;
     }
+
+    sprites.push_back(new Player(&gravity,sprites));
+    sprites.push_back(new Brick(&gravity,sprites));
 
     emscripten_set_main_loop(update, 0, 1);
 
