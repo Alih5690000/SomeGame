@@ -30,11 +30,19 @@ class Sprite{
     Sprite(float* gravity,std::vector<Sprite*>& s):
         gravity(gravity),sprites(s){}
     void MoveAndHandleX(float dt){
+        if (dx>0){
+            dx-=1000*dt;
+            if (dx<0) dx=0;
+        }
+        else if (dx<0){
+            dx+=1000*dt;
+            if (dx>0) dx=0;
+        }
         rect.x+=dx*dt;
         for (auto i:sprites){
             if (i==this) continue;
             if (SDL_HasIntersectionF(&rect,&i->rect)){
-                if (collidable&&i->collidable){
+                if (collidable && i->collidable){
                     if (dx>0){
                         if (weight>i->weight){
                             i->rect.x=rect.x+rect.w;
@@ -50,14 +58,6 @@ class Sprite{
                         else{
                             rect.x=i->rect.x+rect.w;
                         }
-                    }
-                    if (dx>0){
-                        dx-=10000*dt;
-                        if (dx<0) dx=0;
-                    }
-                    else if (dx<0){
-                        dx+=500*dt;
-                        if (dx>0) dx=0;
                     }
                 }
             }
@@ -145,7 +145,10 @@ class Sword:public Weapon{
                     }
                 }
             }
-            w->owner->dx+=200;
+            if (w->owner->dx>0)
+                w->owner->dx+=500;
+            else if (w->owner->dx<0)
+                w->owner->dx-=500;
             wep->cd=wep->maxCd;
         },
         [](Weapon* w){}
@@ -224,7 +227,10 @@ class Player:public Sprite{
         if (state[SDL_SCANCODE_R]){
             if (weapon) weapon->Reload();
         }
-        weapon->Draw();
+        if (weapon){
+            weapon->Update(dt);
+            weapon->Draw();
+        }
         dy+=*gravity*dt;
         MoveAndHandleX(dt);
         MoveAndHandleY(dt);
