@@ -20,6 +20,7 @@ class Sprite{
     bool collidable=true;
     bool active=true;
     float dx,dy;
+    int hp=100;
     float weight=1.f;
     std::vector<Sprite*>& sprites;
     virtual void update(SDL_Renderer*,float dt){}
@@ -130,6 +131,7 @@ class Sword:public Weapon{
     float maxCd=0.5f;
     float swordLength=40.f;
     float swordWidth=10.f;
+    int dmg=100;
     
     Sword(Sprite* o,std::function<void(Weapon*)> draw):Weapon(o,
         [](Weapon* w){
@@ -141,7 +143,7 @@ class Sword:public Weapon{
                 Sprite* i=w->owner->sprites[j];
                 if (i!=w->owner){
                     if (SDL_HasIntersectionF(&w->owner->rect,&hitRect)){
-                        i->active=false;
+                        i->hp-=dmg;
                     }
                 }
             }
