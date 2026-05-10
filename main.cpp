@@ -247,6 +247,7 @@ std::vector<Sprite*> sprites;
 float gravity=100.f;
 float dt=0.f;
 int start,end;
+SDL_FRect mouseRect={0,0,10,10};
 
 void HandleDeltaTime(){
     start=SDL_GetTicks();
@@ -268,6 +269,10 @@ void update() {
                     running = false;
                 }
                 break;
+            case SDL_MOUSEMOTION:
+                mouseRect.x+=event.motion.xrel;
+                mouseRect.y+=event.motion.yrel;
+                break;
             default:
                 break;
         }
@@ -275,6 +280,8 @@ void update() {
 
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
     SDL_RenderClear(renderer);
+    SDL_SetRenderDrawColor(renderer,255,255,255,255);
+    SDL_RenderFillRect(renderer,&mouseRect);
 
     for (auto sprite : sprites) {
         sprite->update(renderer, dt);
