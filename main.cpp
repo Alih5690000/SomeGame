@@ -12,6 +12,14 @@ SDL_Window* window = nullptr;
 SDL_Renderer* renderer = nullptr;
 bool running = true;
 
+class Sprite;
+class Particle;
+
+Particle* CreateParticle(float* fravity,
+    std::vector<Sprite*>& sprites,
+    float x,
+    float y);
+
 class Sprite{
     public:
     SDL_FRect rect;
@@ -27,7 +35,23 @@ class Sprite{
     void render(SDL_Renderer* r){
         SDL_RenderCopyF(r,txt,nullptr,&rect);
     }
+    virtual void take_dmg(int dmg){hp-=dmg;}
     virtual ~Sprite()=default;
+    void alive_take_dmg(int dmg){
+        hp-=dmg;
+
+        for (int i=0;i<10;i++){
+            sprites.push_back(
+                (Sprite*)CreateParticle(
+                    gravity,
+                    sprites,
+                    rect.x+rect.w/2,
+                    rect.y+rect.h/2
+                )
+            );
+        }
+        if (hp<=0) active=false;
+    }
     Sprite(float* gravity,std::vector<Sprite*>& s):
         gravity(gravity),sprites(s){}
     void MoveAndHandleX(float dt){
@@ -93,6 +117,114 @@ class Sprite{
     }
 };
 
+class Particle : public Sprite{
+public:
+    float life=0.5f;
+
+    Particle(
+        float* gravity,
+        std::vector<Sprite*>& s,
+        float x,
+        float y
+    ) : Sprite(gravity,s)
+    {
+        rect={x,y,6,6};
+
+        txt=SDL_CreateTexture(
+            renderer,
+            SDL_PIXELFORMAT_RGBA8888,
+            SDL_TEXTUREACCESS_TARGET,
+            6,
+            6
+        );
+
+        SDL_Texture* prev=SDL_GetRenderTarget(renderer);
+
+        SDL_SetRenderTarget(renderer,txt);
+        SDL_SetRenderDrawColor(renderer,255,0,0,255);
+        SDL_RenderClear(renderer);
+
+        SDL_SetRenderTarget(renderer,prev);
+
+        collidable=false;
+
+        dx=(rand()%400)-200;
+        dy=-(rand()%300);
+    }
+
+    void update(SDL_Renderer* r,float dt) override{
+        life-=dt;
+
+        if (life<=0){
+            active=false;
+            return;
+        }
+
+        dy+=*gravity*dt;
+
+        rect.x+=dx*dt;
+        rect.y+=dy*dt;
+
+        render(r);
+    }
+
+    ~Particle(){
+        SDL_DestroyTexture(txt);
+    }
+};
+
+Particle* CreateParticle(float* gravity,
+    std::vector<Sprite*>& sprites,
+    float x,
+    float y){
+        return new Particle(gravity,sprites,x,y);
+    }
+
+class Dummy : public Sprite{
+public:
+    Dummy(float* gravity,std::vector<Sprite*>& s)
+        : Sprite(gravity,s)
+    {
+        rect={500,300,50,50};
+
+        txt=SDL_CreateTexture(
+            renderer,
+            SDL_PIXELFORMAT_RGBA8888,
+            SDL_TEXTUREACCESS_TARGET,
+            50,
+            50
+        );
+
+        SDL_Texture* prev=SDL_GetRenderTarget(renderer);
+
+        SDL_SetRenderTarget(renderer,txt);
+        SDL_SetRenderDrawColor(renderer,0,0,255,255);
+        SDL_RenderClear(renderer);
+
+        SDL_SetRenderTarget(renderer,prev);
+
+        hp=100;
+    }
+
+    void take_dmg(int dmg) override{
+        alive_take_dmg(dmg);
+        emscripten_log(1,"took damage");
+    }
+
+    void update(SDL_Renderer* r,float dt) override{
+        dy+=*gravity*dt;
+
+        MoveAndHandleX(dt);
+        MoveAndHandleY(dt);
+
+        render(r);
+    }
+
+    ~Dummy(){
+        SDL_DestroyTexture(txt);
+    }
+};
+
 class Weapon{
     public:
     Sprite* owner;
@@ -137,13 +269,18 @@ class Sword:public Weapon{
         [](Weapon* w){
             Sword* wep=dynamic_cast<Sword*>(w);
             if (wep->cd>0) return;
-            SDL_FRect hitRect={w->owner->rect.x,w->owner->rect.y,
-                w->owner->rect.w*2,w->owner->rect.h};
+            SDL_FRect hitRect;
+            if (wep->owner->dx>0)
+                hitRect={w->owner->rect.x,w->owner->rect.y,
+                    w->owner->rect.w*2,w->owner->rect.h};
+            else if(wep->owner->dx<0)
+                hitRect={w->owner->rect.x-w->owner->rect.w*2,w->owner->rect.y,
+                    w->owner->rect.w*2,w->owner->rect.h};
             for (int j=w->owner->sprites.size()-1;j>=0;j--){
                 Sprite* i=w->owner->sprites[j];
                 if (i!=w->owner){
-                    if (SDL_HasIntersectionF(&w->owner->rect,&hitRect)){
-                        i->hp-=dmg;
+                    if (SDL_HasIntersectionF(&i->rect,&hitRect)){
+                        i->take_dmg(wep->dmg);
                     }
                 }
             }
@@ -218,7 +355,7 @@ class Player:public Sprite{
                 dx=200;
         }
         if (state[SDL_SCANCODE_SPACE] && dy==0){
-            dy=100;
+            dy=-100;
         }
         if (state[SDL_SCANCODE_F]){
             if (weapon) weapon->Use();
@@ -281,10 +418,12 @@ void update() {
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
     SDL_RenderClear(renderer);
     SDL_SetRenderDrawColor(renderer,255,255,255,255);
-    SDL_RenderFillRect(renderer,&mouseRect);
+    SDL_RenderFillRectF(renderer,&mouseRect);
 
-    for (auto sprite : sprites) {
-        sprite->update(renderer, dt);
+    size_t count=sprites.size();
+
+    for (int i=0;i<count;i++) {
+        sprites[i]->update(renderer, dt);
     }
 
     for (int i=sprites.size()-1;i>=0;i--){
@@ -307,8 +446,8 @@ int main() {
         "SDL Emscripten",
         SDL_WINDOWPOS_CENTERED,
         SDL_WINDOWPOS_CENTERED,
+        1000,
         800,
-        600,
         SDL_WINDOW_SHOWN
     );
 
@@ -335,6 +474,10 @@ int main() {
     p->weapon=new Sword(p,[](Weapon*){});
     sprites.push_back(p);
     sprites.push_back(new Brick(&gravity,sprites));
+    Brick* b=new Brick(&gravity,sprites);
+    b->rect={0,700,1000,100};
+    sprites.push_back(b);
+    sprites.push_back(new Dummy(&gravity,sprites));
 
     emscripten_set_main_loop(update, 0, 1);
 
