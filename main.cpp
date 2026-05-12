@@ -478,6 +478,8 @@ int main() {
     b->rect={0,700,1000,100};
     sprites.push_back(b);
     sprites.push_back(new Dummy(&gravity,sprites));
+    SDL_ShowCursor(SDL_DISABLE);
+    SDL_SetRelativeMouseMode(SDL_TRUE);
 
     emscripten_set_main_loop(update, 0, 1);
 
