@@ -178,7 +178,44 @@ Particle* CreateParticle(float* gravity,
     float x,
     float y){
         return new Particle(gravity,sprites,x,y);
+}
+
+class Room{
+    public:
+    std::vector<Sprite*> sprites;
+    std::function<void(Room*,SDL_Renderer*,float)> update;
+    Room(std::vector<Sprite*> s, 
+        std::function<void(Room*,SDL_Renderer*,float)> u):sprites(s), update(u){}
+    ~Room(){
+        for (auto i:sprites){
+            delete i;
+        }
     }
+    void update(SDL_Renderer* r,float dt){
+        update(this,r,dt);
+    }
+};
+
+class Location{
+    public:
+    size_t curr;
+    std::vector<Room*> rooms;
+    Location(std::vector<Room*> r):rooms(r){}
+    ~Location(){
+        for (auto i:rooms){
+            delete i;
+        }
+    }
+    void go_forward(){
+        if (curr<rooms.size()-1) curr++;
+    }
+    void go_back(){
+        if (curr>0) curr--;
+    }
+    void update(SDL_Renderer* r,float dt){
+        rooms[curr]->update(rooms[curr],r,dt);
+    }
+};
 
 class Dummy : public Sprite{
 public:
@@ -393,7 +430,7 @@ void HandleDeltaTime(){
     dt=SDL_min(dt,0.033f);
 }
 
-void update() {
+void update(Room* room, SDL_Renderer* r, float dt) {
     HandleDeltaTime();
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
@@ -415,15 +452,15 @@ void update() {
         }
     }
 
-    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
-    SDL_RenderClear(renderer);
-    SDL_SetRenderDrawColor(renderer,255,255,255,255);
-    SDL_RenderFillRectF(renderer,&mouseRect);
+    SDL_SetRenderDrawColor(r, 0, 0, 0, 255);
+    SDL_RenderClear(r);
+    SDL_SetRenderDrawColor(r,255,255,255,255);
+    SDL_RenderFillRectF(r,&mouseRect);
 
     size_t count=sprites.size();
 
     for (int i=0;i<count;i++) {
-        sprites[i]->update(renderer, dt);
+        sprites[i]->update(r, dt);
     }
 
     for (int i=sprites.size()-1;i>=0;i--){
@@ -434,6 +471,12 @@ void update() {
     }
 
     SDL_RenderPresent(renderer);
+}
+
+Location* location;
+
+void Update(){
+    location->update(renderer,dt);
 }
 
 int main() {
@@ -470,6 +513,10 @@ int main() {
         return 1;
     }
 
+    location=new Location({
+        new Room(sprites,update)
+    });
+
     Player* p=new Player(&gravity,sprites);
     p->weapon=new Sword(p,[](Weapon*){});
     sprites.push_back(p);
@@ -481,7 +528,7 @@ int main() {
     SDL_ShowCursor(SDL_DISABLE);
     SDL_SetRelativeMouseMode(SDL_TRUE);
 
-    emscripten_set_main_loop(update, 0, 1);
+    emscripten_set_main_loop(Update, 0, 1);
 
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
