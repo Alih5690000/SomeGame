@@ -183,15 +183,15 @@ Particle* CreateParticle(float* gravity,
 class Room{
     public:
     std::vector<Sprite*> sprites;
-    std::function<void(Room*,SDL_Renderer*,float)> update;
-    Room(std::function<void(Room*,SDL_Renderer*,float)> u):update(u){}
+    std::function<void(Room*,SDL_Renderer*,float)> Update;
+    Room(std::function<void(Room*,SDL_Renderer*,float)> u):Update(u){}
     ~Room(){
         for (auto i:sprites){
             delete i;
         }
     }
     void update(SDL_Renderer* r,float dt){
-        update(this,r,dt);
+        Update(this,r,dt);
     }
 };
 
@@ -212,7 +212,7 @@ class Location{
         if (curr>0) curr--;
     }
     void update(SDL_Renderer* r,float dt){
-        rooms[curr]->update(rooms[curr],r,dt);
+        rooms[curr]->Update(rooms[curr],r,dt);
     }
 };
 
@@ -452,8 +452,6 @@ void update(Room* room, SDL_Renderer* r, float dt) {
 
     SDL_SetRenderDrawColor(r, 0, 0, 0, 255);
     SDL_RenderClear(r);
-    SDL_SetRenderDrawColor(r,255,255,255,255);
-    SDL_RenderFillRectF(r,&mouseRect);
 
     size_t count=room->sprites.size();
 
@@ -467,6 +465,9 @@ void update(Room* room, SDL_Renderer* r, float dt) {
             room->sprites.erase(room->sprites.begin()+i);
         }
     }
+
+    SDL_SetRenderDrawColor(r,255,255,255,255);
+    SDL_RenderFillRectF(r,&mouseRect);
 
     SDL_RenderPresent(renderer);
 }
