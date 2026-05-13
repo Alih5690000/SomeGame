@@ -416,7 +416,6 @@ class Player:public Sprite{
     }
 };
 
-std::vector<Sprite*> sprites;
 float gravity=100.f;
 float dt=0.f;
 int start,end;
@@ -456,16 +455,16 @@ void update(Room* room, SDL_Renderer* r, float dt) {
     SDL_SetRenderDrawColor(r,255,255,255,255);
     SDL_RenderFillRectF(r,&mouseRect);
 
-    size_t count=sprites.size();
+    size_t count=room->sprites.size();
 
     for (int i=0;i<count;i++) {
-        sprites[i]->update(r, dt);
+        room->sprites[i]->update(r, dt);
     }
 
-    for (int i=sprites.size()-1;i>=0;i--){
-        if (!sprites[i]->active){
-            delete sprites[i];
-            sprites.erase(sprites.begin()+i);
+    for (int i=room->sprites.size()-1;i>=0;i--){
+        if (!room->sprites[i]->active){
+            delete room->sprites[i];
+            room->sprites.erase(room->sprites.begin()+i);
         }
     }
 
@@ -516,14 +515,17 @@ int main() {
         new Room(update)
     });
 
-    Player* p=new Player(&gravity,sprites);
+    Player* p=new Player(
+        &gravity,location->rooms[0]->sprites);
     p->weapon=new Sword(p,[](Weapon*){});
     location->rooms[0]->sprites.push_back(p);
-    location->rooms[0]->sprites.push_back(new Brick(&gravity,sprites));
-    Brick* b=new Brick(&gravity,sprites);
+    location->rooms[0]->sprites.push_back(new Brick(
+        &gravity,location->rooms[0]->sprites));
+    Brick* b=new Brick(&gravity,location->rooms[0]->sprites);
     b->rect={0,700,1000,100};
     location->rooms[0]->sprites.push_back(b);
-    location->rooms[0]->sprites.push_back(new Dummy(&gravity,sprites));
+    location->rooms[0]->sprites.push_back(
+        new Dummy(&gravity,location->rooms[0]->sprites));
     SDL_ShowCursor(SDL_DISABLE);
     SDL_SetRelativeMouseMode(SDL_TRUE);
 
