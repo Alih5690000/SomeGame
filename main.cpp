@@ -184,8 +184,7 @@ class Room{
     public:
     std::vector<Sprite*> sprites;
     std::function<void(Room*,SDL_Renderer*,float)> update;
-    Room(std::vector<Sprite*> s, 
-        std::function<void(Room*,SDL_Renderer*,float)> u):sprites(s), update(u){}
+    Room(std::function<void(Room*,SDL_Renderer*,float)> u):update(u){}
     ~Room(){
         for (auto i:sprites){
             delete i;
@@ -514,17 +513,17 @@ int main() {
     }
 
     location=new Location({
-        new Room(sprites,update)
+        new Room(update)
     });
 
     Player* p=new Player(&gravity,sprites);
     p->weapon=new Sword(p,[](Weapon*){});
-    sprites.push_back(p);
-    sprites.push_back(new Brick(&gravity,sprites));
+    location->rooms[0]->sprites.push_back(p);
+    location->rooms[0]->sprites.push_back(new Brick(&gravity,sprites));
     Brick* b=new Brick(&gravity,sprites);
     b->rect={0,700,1000,100};
-    sprites.push_back(b);
-    sprites.push_back(new Dummy(&gravity,sprites));
+    location->rooms[0]->sprites.push_back(b);
+    location->rooms[0]->sprites.push_back(new Dummy(&gravity,sprites));
     SDL_ShowCursor(SDL_DISABLE);
     SDL_SetRelativeMouseMode(SDL_TRUE);
 
