@@ -23,6 +23,7 @@ Particle* CreateParticle(float* fravity,
 class Sprite{
     public:
     SDL_FRect rect;
+    SDL_FRect hurtRect;
     SDL_Texture* txt;
     float* gravity;
     bool collidable=true;
@@ -37,6 +38,9 @@ class Sprite{
     }
     virtual void take_dmg(int dmg){hp-=dmg;}
     virtual ~Sprite()=default;
+    void setHurtbox(){
+        hurtRect={rect.x-10,rect.y-10,rect.w+20,rect.h+20};
+    }
     void alive_take_dmg(int dmg){
         hp-=dmg;
 
@@ -248,6 +252,7 @@ public:
     }
 
     void update(SDL_Renderer* r,float dt) override{
+        setHurtbox();
         dy+=*gravity*dt;
 
         MoveAndHandleX(dt);
@@ -279,6 +284,7 @@ class Enemy:public Sprite{
         alive_take_dmg(dmg);
     }
     void update(SDL_Renderer* r,float dt) override{
+        setHurtbox();
         cd-=dt;
         if (cd<0) cd=0;
         dy+=*gravity*dt;
@@ -290,8 +296,9 @@ class Enemy:public Sprite{
             if (dx>-1500)
                 dx-=1500*dt;
         }
-        if (SDL_HasIntersectionF(&rect,&target->rect) && cd==0.f){
+        if (SDL_HasIntersectionF(&hurtRect,&target->hurtRect) && cd==0.f){
             target->take_dmg(10);
+            emscripten_log(1,"Dealed damage");
             cd=1.f;
         }
         MoveAndHandleX(dt);
@@ -357,7 +364,7 @@ class Sword:public Weapon{
             for (int j=w->owner->sprites.size()-1;j>=0;j--){
                 Sprite* i=w->owner->sprites[j];
                 if (i!=w->owner){
-                    if (SDL_HasIntersectionF(&i->rect,&hitRect)){
+                    if (SDL_HasIntersectionF(&i->hurtRect,&hitRect)){
                         i->take_dmg(wep->dmg);
                     }
                 }
@@ -435,6 +442,7 @@ class Player:public Sprite{
         took_dmg=true;
     }
     void update(SDL_Renderer* r,float dt) override{
+        setHurtbox();
         const Uint8* state=SDL_GetKeyboardState(NULL);
         if (state[SDL_SCANCODE_A]){
             if (dx>-200)
