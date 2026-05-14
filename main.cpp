@@ -261,6 +261,44 @@ public:
     }
 };
 
+class Enemy:public Sprite{
+    public:
+    Sprite* target;
+    Enemy(float* gravity,std::vector<Sprite*>& s,Sprite* t):
+    Sprite(gravity,s),target(t){
+        rect={500,300,50,50};
+        txt=SDL_CreateTexture(renderer,SDL_PIXELFORMAT_RGBA8888,SDL_TEXTUREACCESS_TARGET,50,50);
+        SDL_Texture* prev=SDL_GetRenderTarget(renderer);
+        SDL_SetRenderTarget(renderer,txt);  
+        SDL_SetRenderDrawColor(renderer,0,0,255,255);
+        SDL_RenderClear(renderer);
+        SDL_SetRenderTarget(renderer,prev);
+    }
+    void take_dmg(int dmg) override{
+        alive_take_dmg(dmg);
+    }
+    void update(SDL_Renderer* r,float dt) override{
+        dy+=*gravity*dt;
+        if (target->rect.x>rect.x){
+            if (dx<100)
+                dx+=500*dt;
+        }
+        else if (target->rect.x<rect.x){
+            if (dx>-100)
+                dx-=500*dt;
+        }
+        if (SDL_HasIntersectionF(&rect,&target->rect)){
+            target->take_dmg(10);
+        }
+        MoveAndHandleX(dt);
+        MoveAndHandleY(dt);
+        render(r);
+    }
+    ~Enemy(){
+        SDL_DestroyTexture(txt);
+    }
+};
+
 class Weapon{
     public:
     Sprite* owner;
@@ -371,14 +409,26 @@ class Brick:public Sprite{
 class Player:public Sprite{
     public:
     Weapon* weapon;
+    SDL_Texture* undmgdtxt;
+    SDL_Texture* dmgdtxt;
+    bool took_dmg=false;
     Player(float* gravity,std::vector<Sprite*>& s):Sprite(gravity,s){
         rect={100,100,50,50};
-        txt=SDL_CreateTexture(renderer,SDL_PIXELFORMAT_RGBA8888,SDL_TEXTUREACCESS_TARGET,50,50);
+        undmgdtxt=SDL_CreateTexture(renderer,SDL_PIXELFORMAT_RGBA8888,SDL_TEXTUREACCESS_TARGET,50,50);
+        txt=undmgdtxt;
+        dmgdtxt=SDL_CreateTexture(renderer,SDL_PIXELFORMAT_RGBA8888,SDL_TEXTUREACCESS_TARGET,50,50);
         SDL_Texture* prev=SDL_GetRenderTarget(renderer);
         SDL_SetRenderTarget(renderer,txt);  
         SDL_SetRenderDrawColor(renderer,255,0,0,255);
         SDL_RenderClear(renderer);
+        SDL_SetRenderTarget(renderer,dmgdtxt);
+        SDL_SetRenderDrawColor(renderer,255,255,255,255);
+        SDL_RenderClear(renderer);
         SDL_SetRenderTarget(renderer,prev);
+    }
+    void take_dmg(int dmg) override{
+        alive_take_dmg(dmg);
+        took_dmg=true;
     }
     void update(SDL_Renderer* r,float dt) override{
         const Uint8* state=SDL_GetKeyboardState(NULL);
@@ -409,6 +459,13 @@ class Player:public Sprite{
         dy+=*gravity*dt;
         MoveAndHandleX(dt);
         MoveAndHandleY(dt);
+        if (took_dmg){
+            txt=dmgdtxt;
+            took_dmg=false;
+        }
+        else{
+            txt=undmgdtxt;
+        }
         render(r);
     }
     ~Player(){
@@ -527,6 +584,8 @@ int main() {
     location->rooms[0]->sprites.push_back(b);
     location->rooms[0]->sprites.push_back(
         new Dummy(&gravity,location->rooms[0]->sprites));
+    location->rooms[0]->sprites.push_back(
+        new Enemy(&gravity,location->rooms[0]->sprites,p));
     SDL_ShowCursor(SDL_DISABLE);
     SDL_SetRelativeMouseMode(SDL_TRUE);
 
