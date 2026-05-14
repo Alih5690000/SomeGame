@@ -41,6 +41,7 @@ class Sprite{
     void setHurtbox(){
         hurtRect={rect.x-10,rect.y-10,rect.w+20,rect.h+20};
     }
+    virtual void whenParried(int x,int y){}
     void alive_take_dmg(int dmg){
         hp-=dmg;
 
@@ -266,6 +267,46 @@ public:
     }
 };
 
+class HitSprite:public Sprite{
+    public:
+    float lifeTime;
+    int dmg;
+    Sprite* dealer;
+    bool oneFramed=false;
+    size_t cycles=0;
+    HitSprite(float l,SDL_FRect r,float* g,std::vector<Sprite*>& s,int d,bool o,Sprite* de)
+    :Sprite(g,s),lifeTime(l),dmg(d),oneFramed(o),dealer(de){
+        rect=r;
+        collidable=false;
+    }
+    void update(SDL_Renderer* r,float cd) override{
+        setHurtbox();
+        if (oneFramed){
+            if (cycles>0){
+                active=false;
+                return;
+            }
+        }
+        else{
+            lifeTime-=cd;
+            if (lifeTime<0.f) {
+                active=false;
+                return;
+            }
+        }
+        size_t count=sprites.size();
+        for (int j=0;j<count;j++){
+            if (sprites[j]==this || sprites[j]==dealer) continue;
+            if (SDL_HasIntersectionF(&sprites[j]->hurtRect,&rect)){
+                sprites[j]->take_dmg(dmg);
+                emscripten_log(1,"Hit something");
+            }
+        }
+        cycles++;
+        emscripten_log(1,"Hitbox cycle");
+    }
+};
+
 class Enemy:public Sprite{
     public:
     Sprite* target;
@@ -297,8 +338,8 @@ class Enemy:public Sprite{
                 dx-=1500*dt;
         }
         if (SDL_HasIntersectionF(&hurtRect,&target->hurtRect) && cd==0.f){
-            target->take_dmg(10);
-            emscripten_log(1,"Dealed damage");
+            sprites.push_back(new HitSprite(0.f,hurtRect,gravity,sprites,20,true,this));
+            emscripten_log(1,"Spawned hitbox");
             cd=1.f;
         }
         MoveAndHandleX(dt);
@@ -365,7 +406,7 @@ class Sword:public Weapon{
                 Sprite* i=w->owner->sprites[j];
                 if (i!=w->owner){
                     if (SDL_HasIntersectionF(&i->hurtRect,&hitRect)){
-                        i->take_dmg(wep->dmg);
+                        w->owner->sprites.push_back(new HitSprite(0.f,hitRect,w->owner->gravity,w->owner->sprites,wep->dmg,true,w->owner));
                     }
                 }
             }
@@ -481,7 +522,8 @@ class Player:public Sprite{
         render(r);
     }
     ~Player(){
-        SDL_DestroyTexture(txt);
+        SDL_DestroyTexture(undmgdtxt);
+        SDL_DestroyTexture(dmgdtxt);
     }
 };
 
