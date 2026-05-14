@@ -264,6 +264,7 @@ public:
 class Enemy:public Sprite{
     public:
     Sprite* target;
+    float cd=0.f;
     Enemy(float* gravity,std::vector<Sprite*>& s,Sprite* t):
     Sprite(gravity,s),target(t){
         rect={500,300,50,50};
@@ -278,17 +279,20 @@ class Enemy:public Sprite{
         alive_take_dmg(dmg);
     }
     void update(SDL_Renderer* r,float dt) override{
+        cd-=dt;
+        if (cd<0) cd=0;
         dy+=*gravity*dt;
         if (target->rect.x>rect.x){
-            if (dx<100)
-                dx+=500*dt;
+            if (dx<1500)
+                dx+=1500*dt;
         }
         else if (target->rect.x<rect.x){
-            if (dx>-100)
-                dx-=500*dt;
+            if (dx>-1500)
+                dx-=1500*dt;
         }
-        if (SDL_HasIntersectionF(&rect,&target->rect)){
+        if (SDL_HasIntersectionF(&rect,&target->rect) && cd==0.f){
             target->take_dmg(10);
+            cd=1.f;
         }
         MoveAndHandleX(dt);
         MoveAndHandleY(dt);
