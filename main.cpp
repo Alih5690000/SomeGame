@@ -7,6 +7,37 @@
 #include <map>
 #include <any>
 #include <cmath>
+#define ACTIVE_CHECK() if (!active) return;
+
+SDL_FRect mouseRect={0,0,10,10};
+
+template <typename T>
+struct Vec2{
+    T x,y;
+};
+using Vec2f=Vec2<float>;
+
+Vec2f GetSpeed(SDL_FRect& object, const SDL_FPoint& destination, float speed)
+{
+    float centerX = object.x + object.w * 0.5f;
+    float centerY = object.y + object.h * 0.5f;
+
+    float dx = destination.x - centerX;
+    float dy = destination.y - centerY;
+
+    float distance = sqrtf(dx * dx + dy * dy);
+
+    if (distance <= 0.001f)
+        return {0.f, 0.f};
+
+    dx /= distance;
+    dy /= distance;
+
+    dx *= speed;
+    dy *= speed;
+
+    return {dx, dy};
+}
 
 SDL_Window* window = nullptr;
 SDL_Renderer* renderer = nullptr;
@@ -30,18 +61,21 @@ class Sprite{
     bool active=true;
     float dx,dy;
     int hp=100;
+    int mustGetDmg=0;
     float weight=1.f;
+    bool isParrying=false;
     std::vector<Sprite*>& sprites;
-    virtual void update(SDL_Renderer*,float dt){}
+    virtual void update(SDL_Renderer*,float dt){ACTIVE_CHECK();}
+    virtual void take_dmg(int dmg){mustGetDmg+=dmg;}
+    void receiveDmg(){hp-=mustGetDmg;}
+    virtual void post_update(SDL_Renderer*,float dt){receiveDmg();}
     void render(SDL_Renderer* r){
         SDL_RenderCopyF(r,txt,nullptr,&rect);
     }
-    virtual void take_dmg(int dmg){hp-=dmg;}
     virtual ~Sprite()=default;
     void setHurtbox(){
         hurtRect={rect.x-10,rect.y-10,rect.w+20,rect.h+20};
     }
-    virtual void whenParried(int x,int y){}
     void alive_take_dmg(int dmg){
         hp-=dmg;
 
@@ -158,6 +192,7 @@ public:
     }
 
     void update(SDL_Renderer* r,float dt) override{
+        ACTIVE_CHECK();
         life-=dt;
 
         if (life<=0){
@@ -253,6 +288,7 @@ public:
     }
 
     void update(SDL_Renderer* r,float dt) override{
+        ACTIVE_CHECK();
         setHurtbox();
         dy+=*gravity*dt;
 
@@ -270,16 +306,19 @@ public:
 class HitSprite:public Sprite{
     public:
     float lifeTime;
+    bool wasParried=false;
     int dmg;
     Sprite* dealer;
     bool oneFramed=false;
     size_t cycles=0;
+    std::vector<Sprite*> mustDamage;
     HitSprite(float l,SDL_FRect r,float* g,std::vector<Sprite*>& s,int d,bool o,Sprite* de)
     :Sprite(g,s),lifeTime(l),dmg(d),oneFramed(o),dealer(de){
         rect=r;
         collidable=false;
     }
     void update(SDL_Renderer* r,float cd) override{
+        ACTIVE_CHECK();
         setHurtbox();
         if (oneFramed){
             if (cycles>0){
@@ -298,12 +337,25 @@ class HitSprite:public Sprite{
         for (int j=0;j<count;j++){
             if (sprites[j]==this || sprites[j]==dealer) continue;
             if (SDL_HasIntersectionF(&sprites[j]->hurtRect,&rect)){
-                sprites[j]->take_dmg(dmg);
+                mustDamage.push_back(sprites[j]);
                 emscripten_log(1,"Hit something");
             }
         }
         cycles++;
         emscripten_log(1,"Hitbox cycle");
+    }
+    void post_update(SDL_Renderer* r,float cd) override{
+        for (auto i:mustDamage){
+            if (i->isParrying){
+                dealer->take_dmg(dmg);
+                wasParried=true;
+                active=false;
+            }
+            else{
+                i->take_dmg(dmg);
+            }
+        }
+        mustDamage.clear();
     }
 };
 
@@ -325,17 +377,18 @@ class Enemy:public Sprite{
         alive_take_dmg(dmg);
     }
     void update(SDL_Renderer* r,float dt) override{
+        ACTIVE_CHECK();
         setHurtbox();
         cd-=dt;
         if (cd<0) cd=0;
         dy+=*gravity*dt;
         if (target->rect.x>rect.x){
-            if (dx<1500)
-                dx+=1500*dt;
+            if (dx<1250)
+                dx+=1250*dt;
         }
         else if (target->rect.x<rect.x){
-            if (dx>-1500)
-                dx-=1500*dt;
+            if (dx>-1250)
+                dx-=1250*dt;
         }
         if (SDL_HasIntersectionF(&hurtRect,&target->hurtRect) && cd==0.f){
             sprites.push_back(new HitSprite(0.f,hurtRect,gravity,sprites,20,true,this));
@@ -454,6 +507,7 @@ class Brick:public Sprite{
         SDL_SetRenderTarget(renderer,prev);
     }
     void update(SDL_Renderer* r,float dt) override{
+        ACTIVE_CHECK();
         render(r);
     }
 };
@@ -483,6 +537,7 @@ class Player:public Sprite{
         took_dmg=true;
     }
     void update(SDL_Renderer* r,float dt) override{
+        ACTIVE_CHECK();
         setHurtbox();
         const Uint8* state=SDL_GetKeyboardState(NULL);
         if (state[SDL_SCANCODE_A]){
@@ -504,6 +559,21 @@ class Player:public Sprite{
         }
         if (state[SDL_SCANCODE_R]){
             if (weapon) weapon->Reload();
+        }
+        isParrying=false;
+        if (state[SDL_SCANCODE_E]){
+            SDL_FRect parryRect={rect.x-20,rect.y-20,rect.w+40,rect.h+40};
+            size_t count=sprites.size();
+            for (int j=0;j<count;j++){
+                Sprite* i=sprites[j];
+                if (i!=this){
+                    if (SDL_HasIntersectionF(&i->hurtRect,&parryRect)){
+                        Vec2f speed=GetSpeed(i->rect,
+                            {rect.x+rect.w/2.f,rect.y+rect.h/2.f},300.f);
+                        isParrying=true;
+                    }
+                }
+            }
         }
         if (weapon){
             weapon->Update(dt);
@@ -530,7 +600,6 @@ class Player:public Sprite{
 float gravity=100.f;
 float dt=0.f;
 int start,end;
-SDL_FRect mouseRect={0,0,10,10};
 
 void HandleDeltaTime(){
     start=SDL_GetTicks();
@@ -570,7 +639,11 @@ void update(Room* room, SDL_Renderer* r, float dt) {
         room->sprites[i]->update(r, dt);
     }
 
-    for (int i=room->sprites.size()-1;i>=0;i--){
+    for (int i=0;i<count;i++) {
+        room->sprites[i]->post_update(r, dt);
+    }
+
+    for (int i=count-1;i>=0;i--){
         if (!room->sprites[i]->active){
             delete room->sprites[i];
             room->sprites.erase(room->sprites.begin()+i);
