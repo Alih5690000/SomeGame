@@ -68,7 +68,7 @@ class Sprite{
     virtual void update(SDL_Renderer*,float dt){ACTIVE_CHECK();}
     virtual void take_dmg(int dmg){mustGetDmg+=dmg;}
     void receiveDmg(){hp-=mustGetDmg;}
-    virtual void post_update(SDL_Renderer*,float dt){receiveDmg();}
+    virtual void post_update(SDL_Renderer*,float dt){receiveDmg();mustGetDmg=0;}
     void render(SDL_Renderer* r){
         SDL_RenderCopyF(r,txt,nullptr,&rect);
     }
@@ -95,11 +95,11 @@ class Sprite{
         gravity(gravity),sprites(s){}
     void MoveAndHandleX(float dt){
         if (dx>0){
-            dx-=1000*dt;
+            dx-=dx * 8.f * dt;
             if (dx<0) dx=0;
         }
         else if (dx<0){
-            dx+=1000*dt;
+            dx+=dx * -8.f * dt;
             if (dx>0) dx=0;
         }
         rect.x+=dx*dt;
@@ -383,12 +383,12 @@ class Enemy:public Sprite{
         if (cd<0) cd=0;
         dy+=*gravity*dt;
         if (target->rect.x>rect.x){
-            if (dx<1250)
-                dx+=1250*dt;
+            if (dx<250)
+                dx+=250*dt;
         }
         else if (target->rect.x<rect.x){
-            if (dx>-1250)
-                dx-=1250*dt;
+            if (dx>-250)
+                dx-=250*dt;
         }
         if (SDL_HasIntersectionF(&hurtRect,&target->hurtRect) && cd==0.f){
             sprites.push_back(new HitSprite(0.f,hurtRect,gravity,sprites,20,true,this));
