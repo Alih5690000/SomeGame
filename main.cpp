@@ -95,11 +95,11 @@ class Sprite{
         gravity(gravity),sprites(s){}
     void MoveAndHandleX(float dt){
         if (dx>0){
-            dx-=1000*dt;
+            dx-=dx * 8.f * dt;
             if (dx<0) dx=0;
         }
         else if (dx<0){
-            dx+=1000*dt;
+            dx+=dx * -8.f * dt;
             if (dx>0) dx=0;
         }
         rect.x+=dx*dt;
@@ -378,12 +378,12 @@ class Enemy:public Sprite{
         if (cd<0) cd=0;
         dy+=*gravity*dt;
         if (target->rect.x>rect.x){
-            if (dx<1250)
-                dx+=1250*dt;
+            if (dx<250)
+                dx+=250*dt;
         }
         else if (target->rect.x<rect.x){
-            if (dx>-1250)
-                dx-=1250*dt;
+            if (dx>-250)
+                dx-=250*dt;
         }
         if (SDL_HasIntersectionF(&hurtRect,&target->hurtRect) && cd==0.f){
             secondsPreparing+=dt;
