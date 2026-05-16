@@ -68,7 +68,7 @@ class Sprite{
     virtual void update(SDL_Renderer*,float dt){ACTIVE_CHECK();}
     virtual void take_dmg(int dmg){mustGetDmg+=dmg;}
     void receiveDmg(){hp-=mustGetDmg;}
-    virtual void post_update(SDL_Renderer*,float dt){receiveDmg();}
+    virtual void post_update(SDL_Renderer*,float dt){receiveDmg();mustGetDmg=0;}
     virtual void render(SDL_Renderer* r){
         SDL_RenderCopyF(r,txt,nullptr,&rect);
     }
