@@ -69,7 +69,7 @@ class Sprite{
     virtual void take_dmg(int dmg){mustGetDmg+=dmg;}
     void receiveDmg(){hp-=mustGetDmg;}
     virtual void post_update(SDL_Renderer*,float dt){receiveDmg();}
-    void render(SDL_Renderer* r){
+    virtual void render(SDL_Renderer* r){
         SDL_RenderCopyF(r,txt,nullptr,&rect);
     }
     virtual ~Sprite()=default;
@@ -363,15 +363,10 @@ class Enemy:public Sprite{
     public:
     Sprite* target;
     float cd=0.f;
+    float secondsPreparing=0.f;
     Enemy(float* gravity,std::vector<Sprite*>& s,Sprite* t):
     Sprite(gravity,s),target(t){
         rect={500,300,50,50};
-        txt=SDL_CreateTexture(renderer,SDL_PIXELFORMAT_RGBA8888,SDL_TEXTUREACCESS_TARGET,50,50);
-        SDL_Texture* prev=SDL_GetRenderTarget(renderer);
-        SDL_SetRenderTarget(renderer,txt);  
-        SDL_SetRenderDrawColor(renderer,0,0,255,255);
-        SDL_RenderClear(renderer);
-        SDL_SetRenderTarget(renderer,prev);
     }
     void take_dmg(int dmg) override{
         alive_take_dmg(dmg);
@@ -391,13 +386,25 @@ class Enemy:public Sprite{
                 dx-=1250*dt;
         }
         if (SDL_HasIntersectionF(&hurtRect,&target->hurtRect) && cd==0.f){
-            sprites.push_back(new HitSprite(0.f,hurtRect,gravity,sprites,20,true,this));
-            emscripten_log(1,"Spawned hitbox");
-            cd=1.f;
+            secondsPreparing+=dt;
+            if (secondsPreparing>0.5f){
+                secondsPreparing=0.f;
+                sprites.push_back(new HitSprite(0.f,hurtRect,gravity,sprites,20,true,this));
+                emscripten_log(1,"Spawned hitbox");
+                cd=1.f;
+            }
+        }
+        else{
+            secondsPreparing=0.f;
         }
         MoveAndHandleX(dt);
         MoveAndHandleY(dt);
         render(r);
+    }
+    void render(SDL_Renderer* r) override{
+        int color=(secondsPreparing/0.5f)*255;
+        SDL_SetRenderDrawColor(r,color,color,255,255);
+        SDL_RenderFillRectF(r,&rect);
     }
     ~Enemy(){
         SDL_DestroyTexture(txt);
