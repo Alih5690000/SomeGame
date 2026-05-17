@@ -95,11 +95,11 @@ class Sprite{
         gravity(gravity),sprites(s){}
     void MoveAndHandleX(float dt){
         if (dx>0){
-            dx-=dx * 8.f * dt;
+            dx-=1000*dt;
             if (dx<0) dx=0;
         }
         else if (dx<0){
-            dx+=dx * -8.f * dt;
+            dx+=1000*dt;
             if (dx>0) dx=0;
         }
         rect.x+=dx*dt;
@@ -363,6 +363,7 @@ class Enemy:public Sprite{
     public:
     Sprite* target;
     float cd=0.f;
+    bool dashin=false;
     float secondsPreparing=0.f;
     bool attackState=false;
     Enemy(float* gravity,std::vector<Sprite*>& s,Sprite* t):
@@ -379,38 +380,44 @@ class Enemy:public Sprite{
         if (cd<0) cd=0;
         dy+=*gravity*dt;
         if (target->rect.x>rect.x){
-            if (target->rect.x-rect.x<200)
+            if (target->rect.x-rect.x<200 && target->rect.y-rect.y<50 && target->rect.y-rect.y>-50 && cd==0)
                 attackState=true;
             else 
                 attackState=false;
-            if (dx<250)
-                dx+=250;
+            if (dx<50)
+                dx+=50;
         }
         else if (target->rect.x<rect.x){
-            if (target->rect.x-rect.x>-200)
+            if (target->rect.x-rect.x>-200 && target->rect.y-rect.y<50 && target->rect.y-rect.y>-50 && cd==0)
                 attackState=true;
             else 
                 attackState=false;
-            if (dx>-250)
-                dx-=250;
+            if (dx>-50)
+                dx-=50;
         }
         if (attackState){
-            secondsPreparing+=cd;
+            emscripten_log(1,"Preparing attack");
+            secondsPreparing+=dt;
             if (secondsPreparing>0.5f){
+                emscripten_log(1,"Attack!");
                 if (target->rect.x>rect.x)
-                    dx=-1000
+                    dx=600;
                 else
-                    dx=1000;
+                    dx=-600;
                 secondsPreparing=0.f;
+                attackState=false;
+                dashin=true;
             }
         }
         else{
             secondsPreparing=0.f;
         }
-        if (SDL_HasIntersectionF(&hurtRect,&target->hurtRect)){
+        if (SDL_HasIntersectionF(&hurtRect,&target->rect) && cd==0 && dashin){
             sprites.push_back(new HitSprite(0.f,hurtRect,gravity,sprites,20,true,this));
             emscripten_log(1,"Spawned hitbox");
-            dx=-dx;
+            dx=-dx*0.5f;
+            cd=1.f;
+            dashin=false;
         }
         MoveAndHandleX(dt);
         MoveAndHandleY(dt);
@@ -731,8 +738,6 @@ int main() {
     Brick* b=new Brick(&gravity,location->rooms[0]->sprites);
     b->rect={0,700,1000,100};
     location->rooms[0]->sprites.push_back(b);
-    location->rooms[0]->sprites.push_back(
-        new Dummy(&gravity,location->rooms[0]->sprites));
     location->rooms[0]->sprites.push_back(
         new Enemy(&gravity,location->rooms[0]->sprites,p));
     SDL_ShowCursor(SDL_DISABLE);
