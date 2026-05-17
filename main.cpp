@@ -364,6 +364,7 @@ class Enemy:public Sprite{
     Sprite* target;
     float cd=0.f;
     float secondsPreparing=0.f;
+    bool attackState=false;
     Enemy(float* gravity,std::vector<Sprite*>& s,Sprite* t):
     Sprite(gravity,s),target(t){
         rect={500,300,50,50};
@@ -378,24 +379,38 @@ class Enemy:public Sprite{
         if (cd<0) cd=0;
         dy+=*gravity*dt;
         if (target->rect.x>rect.x){
+            if (target->rect.x-rect.x<200)
+                attackState=true;
+            else 
+                attackState=false;
             if (dx<250)
-                dx+=250*dt;
+                dx+=250;
         }
         else if (target->rect.x<rect.x){
+            if (target->rect.x-rect.x>-200)
+                attackState=true;
+            else 
+                attackState=false;
             if (dx>-250)
-                dx-=250*dt;
+                dx-=250;
         }
-        if (SDL_HasIntersectionF(&hurtRect,&target->hurtRect) && cd==0.f){
-            secondsPreparing+=dt;
+        if (attackState){
+            secondsPreparing+=cd;
             if (secondsPreparing>0.5f){
+                if (target->rect.x>rect.x)
+                    dx=-1000
+                else
+                    dx=1000;
                 secondsPreparing=0.f;
-                sprites.push_back(new HitSprite(0.f,hurtRect,gravity,sprites,20,true,this));
-                emscripten_log(1,"Spawned hitbox");
-                cd=1.f;
             }
         }
         else{
             secondsPreparing=0.f;
+        }
+        if (SDL_HasIntersectionF(&hurtRect,&target->hurtRect)){
+            sprites.push_back(new HitSprite(0.f,hurtRect,gravity,sprites,20,true,this));
+            emscripten_log(1,"Spawned hitbox");
+            dx=-dx;
         }
         MoveAndHandleX(dt);
         MoveAndHandleY(dt);
