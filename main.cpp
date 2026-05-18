@@ -51,6 +51,8 @@ Particle* CreateParticle(float* fravity,
     float x,
     float y);
 
+void HitStop(SDL_Renderer*);
+
 class Sprite{
     public:
     SDL_FRect rect;
@@ -349,6 +351,7 @@ class HitSprite:public Sprite{
             if (i->isParrying){
                 dealer->take_dmg(dmg);
                 wasParried=true;
+                HitStop();
                 active=false;
             }
             else{
@@ -547,6 +550,9 @@ class Player:public Sprite{
     SDL_Texture* undmgdtxt;
     SDL_Texture* dmgdtxt;
     bool took_dmg=false;
+    float Y=0;
+    float E_held=false;
+    float parryCd=0.f;
     Player(float* gravity,std::vector<Sprite*>& s):Sprite(gravity,s){
         rect={100,100,50,50};
         undmgdtxt=SDL_CreateTexture(renderer,SDL_PIXELFORMAT_RGBA8888,SDL_TEXTUREACCESS_TARGET,50,50);
@@ -568,6 +574,8 @@ class Player:public Sprite{
     void update(SDL_Renderer* r,float dt) override{
         ACTIVE_CHECK();
         setHurtbox();
+        parryCd-=dt;
+        if (parryCd<0.f) parryCd=0.f;
         const Uint8* state=SDL_GetKeyboardState(NULL);
         if (state[SDL_SCANCODE_A]){
             if (dx>-200)
@@ -590,7 +598,7 @@ class Player:public Sprite{
             if (weapon) weapon->Reload();
         }
         isParrying=false;
-        if (state[SDL_SCANCODE_E]){
+        if (state[SDL_SCANCODE_E] && !E_held){
             SDL_FRect parryRect={rect.x-20,rect.y-20,rect.w+40,rect.h+40};
             size_t count=sprites.size();
             for (int j=0;j<count;j++){
@@ -603,6 +611,15 @@ class Player:public Sprite{
                     }
                 }
             }
+            parryCd=0.5f;
+            E_held=true;
+        }
+        else if (!state[SDL_SCANCODE_E]){
+            E_held=false;
+        }
+        if (cd>0.f){
+            SDL_FRect r={rect.x+rect.w+10,rect.y+Y,10,10};
+            
         }
         if (weapon){
             weapon->Update(dt);
