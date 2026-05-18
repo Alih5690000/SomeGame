@@ -51,18 +51,6 @@ Particle* CreateParticle(float* fravity,
     float x,
     float y);
 
-void HitStop(SDL_Renderer* r){
-    HandleDeltaTime();
-    SDL_Event event;
-    while (SDL_PollEvent(&event)) {
-        switch (event.type) {
-            case SDL_QUIT:
-                running = false;
-                break;
-        }
-    }
-}
-
 class Sprite{
     public:
     SDL_FRect rect;
@@ -361,7 +349,6 @@ class HitSprite:public Sprite{
             if (i->isParrying){
                 dealer->take_dmg(dmg);
                 wasParried=true;
-                HitStop();
                 active=false;
             }
             else{
