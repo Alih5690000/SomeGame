@@ -303,6 +303,8 @@ public:
     }
 };
 
+float hitStopTime=0.f;
+
 class HitSprite:public Sprite{
     public:
     float lifeTime;
@@ -349,6 +351,7 @@ class HitSprite:public Sprite{
             if (i->isParrying){
                 dealer->take_dmg(dmg);
                 wasParried=true;
+                hitStop=0.5f;
                 active=false;
             }
             else{
@@ -672,6 +675,11 @@ void update(Room* room, SDL_Renderer* r, float dt) {
             default:
                 break;
         }
+    }
+
+    if (hitStopTime>0.f){
+        SDL_RenderPresent(r);
+        return;
     }
 
     SDL_SetRenderDrawColor(r, 0, 0, 0, 255);
