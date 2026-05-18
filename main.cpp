@@ -351,7 +351,7 @@ class HitSprite:public Sprite{
             if (i->isParrying){
                 dealer->take_dmg(dmg);
                 wasParried=true;
-                hitStop=0.5f;
+                hitStopTime=0.5f;
                 active=false;
             }
             else{
@@ -552,6 +552,7 @@ class Player:public Sprite{
     bool took_dmg=false;
     float Y=0;
     float E_held=false;
+    float parryTimer;
     float parryCd=0.f;
     Player(float* gravity,std::vector<Sprite*>& s):Sprite(gravity,s){
         rect={100,100,50,50};
@@ -576,6 +577,8 @@ class Player:public Sprite{
         setHurtbox();
         parryCd-=dt;
         if (parryCd<0.f) parryCd=0.f;
+        parryTimer-=dt;
+        if (parryTimer<0.f) parryTimer=0.f;
         const Uint8* state=SDL_GetKeyboardState(NULL);
         if (state[SDL_SCANCODE_A]){
             if (dx>-200)
@@ -607,7 +610,7 @@ class Player:public Sprite{
                     if (SDL_HasIntersectionF(&i->hurtRect,&parryRect)){
                         Vec2f speed=GetSpeed(i->rect,
                             {rect.x+rect.w/2.f,rect.y+rect.h/2.f},300.f);
-                        isParrying=true;
+                        parryTimer=5.f;
                     }
                 }
             }
@@ -617,10 +620,20 @@ class Player:public Sprite{
         else if (!state[SDL_SCANCODE_E]){
             E_held=false;
         }
-        if (cd>0.f){
-            SDL_FRect r={rect.x+rect.w+10,rect.y+Y,10,10};
+        if (parryTimer>0){
+            isParrying=true;
+        }
+        else{
+            isParrying=false;
+        }
+        if (parryCd>0.f){
+            Y+=dt*rect.w*2;
+            SDL_FRect re={rect.x+rect.w+10,rect.y+Y,10,10};
             SDL_SetRenderDrawColor(r,0,0,255,255);
-            SDL_RenderFillRectF(r,rect);
+            SDL_RenderFillRectF(r,&re);
+        }
+        else{
+            Y=0;
         }
         if (weapon){
             weapon->Update(dt);
@@ -678,6 +691,8 @@ void update(Room* room, SDL_Renderer* r, float dt) {
     }
 
     if (hitStopTime>0.f){
+        hitStopTime-=dt;
+        if (hitStopTime<0.f) hitStopTime=0.f;
         SDL_RenderPresent(r);
         return;
     }
