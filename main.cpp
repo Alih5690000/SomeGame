@@ -51,7 +51,17 @@ Particle* CreateParticle(float* fravity,
     float x,
     float y);
 
-void HitStop(SDL_Renderer*);
+void HitStop(SDL_Renderer* r){
+    HandleDeltaTime();
+    SDL_Event event;
+    while (SDL_PollEvent(&event)) {
+        switch (event.type) {
+            case SDL_QUIT:
+                running = false;
+                break;
+        }
+    }
+}
 
 class Sprite{
     public:
@@ -619,7 +629,8 @@ class Player:public Sprite{
         }
         if (cd>0.f){
             SDL_FRect r={rect.x+rect.w+10,rect.y+Y,10,10};
-            
+            SDL_SetRenderDrawColor(r,0,0,255,255);
+            SDL_RenderFillRectF(r,rect);
         }
         if (weapon){
             weapon->Update(dt);
