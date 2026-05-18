@@ -610,7 +610,7 @@ class Player:public Sprite{
                     if (SDL_HasIntersectionF(&i->hurtRect,&parryRect)){
                         Vec2f speed=GetSpeed(i->rect,
                             {rect.x+rect.w/2.f,rect.y+rect.h/2.f},300.f);
-                        parryTimer=5.f;
+                        parryTimer=1.25f;
                     }
                 }
             }
@@ -628,7 +628,17 @@ class Player:public Sprite{
         }
         if (parryCd>0.f){
             Y+=dt*rect.w*2;
-            SDL_FRect re={rect.x+rect.w+10,rect.y+Y,10,10};
+            float X=0;
+            if (dx<0){
+                X=rect.x-10;
+            }
+            else if (dx>0){
+                X=rect.x+rect.w+10;
+            }
+            else{
+                X=rect.x+rect.w/2-5;
+            }
+            SDL_FRect re={X,rect.y+Y,20,20};
             SDL_SetRenderDrawColor(r,0,0,255,255);
             SDL_RenderFillRectF(r,&re);
         }
