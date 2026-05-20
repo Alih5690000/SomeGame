@@ -95,9 +95,9 @@ class Enemy:public Sprite{
             if (secondsPreparing>0.5f){
                 emscripten_log(1,"Attack!");
                 if (target->rect.x>rect.x)
-                    dx=600;
+                    dx=400;
                 else
-                    dx=-600;
+                    dx=-400;
                 secondsPreparing=0.f;
                 attackState=false;
                 dashin=true;
@@ -121,9 +121,6 @@ class Enemy:public Sprite{
         int color=(secondsPreparing/0.5f)*255;
         SDL_SetRenderDrawColor(r,color,color,255,255);
         SDL_RenderFillRectF(r,&rect);
-    }
-    ~Enemy(){
-        SDL_DestroyTexture(txt);
     }
 };
 
@@ -171,14 +168,14 @@ class Player:public Sprite{
         SDL_RenderClear(renderer);
         SDL_SetRenderTarget(renderer,prev);
     }
-    void take_dmg(int dmg) override{
+    /*void take_dmg(int dmg) override{
         alive_take_dmg(dmg);
         took_dmg=true;
-    }
+    }*/
     void HandleParry(){
         SDL_FRect parryRect={rect.x-50,rect.y-50,rect.w+100,rect.h+100};
         size_t count=sprites.size();
-        for (int j=0;j<count;j++){
+        for (size_t j=0;j<count;j++){
             Sprite* i=sprites[j];
             if (i!=this){
                 if (SDL_HasIntersectionF(&i->hurtRect,&parryRect)){

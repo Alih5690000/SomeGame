@@ -57,15 +57,15 @@ void update(Room* room, SDL_Renderer* r, float dt) {
 
     size_t count=room->sprites.size();
 
-    for (int i=0;i<count;i++) {
+    for (size_t i=0;i<count;i++) {
         room->sprites[i]->update(r, dt);
     }
 
-    for (int i=0;i<count;i++) {
+    for (size_t i=0;i<count;i++) {
         room->sprites[i]->post_update(r, dt);
     }
 
-    for (int i=count-1;i>=0;i--){
+    for (size_t i=count; i-->0;){
         if (!room->sprites[i]->active){
             delete room->sprites[i];
             room->sprites.erase(room->sprites.begin()+i);

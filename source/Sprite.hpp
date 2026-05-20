@@ -97,7 +97,7 @@ class Sprite{
                             rect.x = i->rect.x + i->rect.w;
                         }
                     }
-                    if (Ai){
+                    if (Ai && !midAir){
                         dy=jumpboost;
                         midAir=true;
                     }
@@ -168,7 +168,7 @@ class HitSprite:public Sprite{
             }
         }
         size_t count=sprites.size();
-        for (int j=0;j<count;j++){
+        for (size_t j=0;j<count;j++){
             if (sprites[j]==this || sprites[j]==dealer) continue;
             if (SDL_HasIntersectionF(&sprites[j]->hurtRect,&rect)){
                 mustDamage.push_back(sprites[j]);

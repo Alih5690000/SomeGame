@@ -54,11 +54,13 @@ class Sword:public Weapon{
             else if(wep->owner->dx<0)
                 hitRect={w->owner->rect.x-w->owner->rect.w*2,w->owner->rect.y,
                     w->owner->rect.w*2,w->owner->rect.h};
-            for (int j=w->owner->sprites.size()-1;j>=0;j--){
-                Sprite* i=w->owner->sprites[j];
-                if (i!=w->owner){
-                    if (SDL_HasIntersectionF(&i->hurtRect,&hitRect)){
-                        w->owner->sprites.push_back(new HitSprite(0.f,hitRect,w->owner->gravity,w->owner->sprites,wep->dmg,true,w->owner));
+            if (!w->owner->sprites.empty()){
+                for (ptrdiff_t j=(ptrdiff_t)w->owner->sprites.size()-1;j>=0;--j){
+                    Sprite* i=w->owner->sprites[j];
+                    if (i!=w->owner){
+                        if (SDL_HasIntersectionF(&i->hurtRect,&hitRect)){
+                            w->owner->sprites.push_back(new HitSprite(0.f,hitRect,w->owner->gravity,w->owner->sprites,wep->dmg,true,w->owner));
+                        }
                     }
                 }
             }

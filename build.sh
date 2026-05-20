@@ -7,4 +7,9 @@ em++.bat source/main.cpp -o main.html \
   -s SDL2_MIXER_FORMATS='["ogg","mp3","wav"]' \
   -s ALLOW_MEMORY_GROWTH=1 \
   --preload-file assets \
-  -O2 && python -m http.server 8000 && chrome http://localhost:8000/main.html
+  -g3 \
+  -sASSERTIONS=2 \
+  -sSAFE_HEAP=1 \
+  -sSTACK_OVERFLOW_CHECK=2 \
+  -sNO_DISABLE_EXCEPTION_CATCHING \
+  && python -m http.server 8000
