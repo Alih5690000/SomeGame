@@ -1,3 +1,4 @@
+#pragma once
 #include "Utils.hpp"
 #include <SDL2/SDL.h>
 #include <vector>
@@ -14,6 +15,8 @@ Particle* CreateParticle(float* fravity,
 class Sprite{
     public:
     SDL_FRect rect;
+    bool Ai=false;
+    float jumpboost=-100.f;
     SDL_FRect hurtRect;
     SDL_Texture* txt;
     float* gravity;
@@ -72,25 +75,31 @@ class Sprite{
             if (dx>0) dx=0;
         }
         rect.x+=dx*dt;
-        for (auto i:sprites){
+        size_t count=sprites.size();
+        for (size_t j=0;j<count;j++){
+            Sprite* i=sprites[j];
             if (i==this) continue;
             if (SDL_HasIntersectionF(&rect,&i->rect)){
                 if (collidable && i->collidable){
-                    if (dx>0){
-                        if (weight>i->weight){
-                            i->rect.x=rect.x+rect.w;
+                    if (dx > 0){
+                        if (weight > i->weight){
+                            i->rect.x = rect.x + rect.w;
                         }
                         else{
-                            rect.x=i->rect.x-rect.w;
+                            rect.x = i->rect.x - rect.w;
                         }
                     }
-                    else{
-                        if (weight>i->weight){
-                            i->rect.x=rect.x-rect.w;
+                    else if (dx < 0){
+                        if (weight > i->weight){
+                            i->rect.x = rect.x - i->rect.w;
                         }
                         else{
-                            rect.x=i->rect.x+rect.w;
+                            rect.x = i->rect.x + i->rect.w;
                         }
+                    }
+                    if (Ai){
+                        dy=jumpboost;
+                        midAir=true;
                     }
                 }
             }
@@ -98,11 +107,12 @@ class Sprite{
     }
     void MoveAndHandleY(float dt){
         rect.y+=dy*dt;
-        for (auto i:sprites){
+        for (size_t j=0;j<sprites.size();j++){
+            Sprite* i=sprites[j];
             if (i==this) continue;
             if (SDL_HasIntersectionF(&rect,&i->rect)){
                 if (collidable&&i->collidable){
-                    midAir=false;
+                    midAir=true;
                     if (dy>0){
                         if (weight>i->weight){
                             i->rect.y=rect.y+rect.h;
@@ -110,6 +120,7 @@ class Sprite{
                         else{
                             rect.y=i->rect.y-rect.h;
                         }
+                        midAir=false;
                     }
                     else{
                         if (weight>i->weight){
@@ -123,6 +134,63 @@ class Sprite{
                 }
             }
         }
+    }
+};
+
+class HitSprite:public Sprite{
+    public:
+    float lifeTime;
+    bool wasParried=false;
+    int dmg;
+    Sprite* dealer;
+    bool oneFramed=false;
+    size_t cycles=0;
+    std::vector<Sprite*> mustDamage;
+    HitSprite(float l,SDL_FRect r,float* g,std::vector<Sprite*>& s,int d,bool o,Sprite* de)
+    :Sprite(g,s),lifeTime(l),dmg(d),oneFramed(o),dealer(de){
+        rect=r;
+        collidable=false;
+    }
+    void update(SDL_Renderer* r,float cd) override{
+        ACTIVE_CHECK();
+        setHurtbox();
+        if (oneFramed){
+            if (cycles>0){
+                active=false;
+                return;
+            }
+        }
+        else{
+            lifeTime-=cd;
+            if (lifeTime<0.f) {
+                active=false;
+                return;
+            }
+        }
+        size_t count=sprites.size();
+        for (int j=0;j<count;j++){
+            if (sprites[j]==this || sprites[j]==dealer) continue;
+            if (SDL_HasIntersectionF(&sprites[j]->hurtRect,&rect)){
+                mustDamage.push_back(sprites[j]);
+                emscripten_log(1,"Hit something");
+            }
+        }
+        cycles++;
+        emscripten_log(1,"Hitbox cycle");
+    }
+    void post_update(SDL_Renderer* r,float cd) override{
+        for (auto i:mustDamage){
+            if (i->isParrying){
+                dealer->take_dmg(dmg);
+                wasParried=true;
+                hitStopTime=0.5f;
+                active=false;
+            }
+            else{
+                i->take_dmg(dmg);
+            }
+        }
+        mustDamage.clear();
     }
 };
 

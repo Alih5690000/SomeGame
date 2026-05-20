@@ -1,3 +1,4 @@
+#pragma once
 #include <functional>
 #include "Sprite.hpp"
 #include "Utils.hpp"
@@ -7,7 +8,9 @@ class Room{
     public:
     std::vector<Sprite*> sprites;
     std::function<void(Room*,SDL_Renderer*,float)> Update;
-    Room(std::function<void(Room*,SDL_Renderer*,float)> u):Update(u){}
+    Room(std::function<void(Room*,SDL_Renderer*,float)> u):Update(u){
+        sprites.reserve(999);
+    }
     ~Room(){
         for (auto i:sprites){
             delete i;

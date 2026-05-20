@@ -1,7 +1,9 @@
+#pragma once
 #include <emscripten.h>
 #include <emscripten/html5.h>
 #include "Sprite.hpp"
 #include "Locations.hpp"
+#include "Weapons.hpp"
 
 class Dummy : public Sprite{
 public:
@@ -50,63 +52,6 @@ public:
     }
 };
 
-class HitSprite:public Sprite{
-    public:
-    float lifeTime;
-    bool wasParried=false;
-    int dmg;
-    Sprite* dealer;
-    bool oneFramed=false;
-    size_t cycles=0;
-    std::vector<Sprite*> mustDamage;
-    HitSprite(float l,SDL_FRect r,float* g,std::vector<Sprite*>& s,int d,bool o,Sprite* de)
-    :Sprite(g,s),lifeTime(l),dmg(d),oneFramed(o),dealer(de){
-        rect=r;
-        collidable=false;
-    }
-    void update(SDL_Renderer* r,float cd) override{
-        ACTIVE_CHECK();
-        setHurtbox();
-        if (oneFramed){
-            if (cycles>0){
-                active=false;
-                return;
-            }
-        }
-        else{
-            lifeTime-=cd;
-            if (lifeTime<0.f) {
-                active=false;
-                return;
-            }
-        }
-        size_t count=sprites.size();
-        for (int j=0;j<count;j++){
-            if (sprites[j]==this || sprites[j]==dealer) continue;
-            if (SDL_HasIntersectionF(&sprites[j]->hurtRect,&rect)){
-                mustDamage.push_back(sprites[j]);
-                emscripten_log(1,"Hit something");
-            }
-        }
-        cycles++;
-        emscripten_log(1,"Hitbox cycle");
-    }
-    void post_update(SDL_Renderer* r,float cd) override{
-        for (auto i:mustDamage){
-            if (i->isParrying){
-                dealer->take_dmg(dmg);
-                wasParried=true;
-                hitStopTime=0.5f;
-                active=false;
-            }
-            else{
-                i->take_dmg(dmg);
-            }
-        }
-        mustDamage.clear();
-    }
-};
-
 class Enemy:public Sprite{
     public:
     Sprite* target;
@@ -117,6 +62,7 @@ class Enemy:public Sprite{
     Enemy(float* gravity,std::vector<Sprite*>& s,Sprite* t):
     Sprite(gravity,s),target(t){
         rect={500,300,50,50};
+        Ai=true;
     }
     void take_dmg(int dmg) override{
         alive_take_dmg(dmg);
@@ -238,7 +184,7 @@ class Player:public Sprite{
                 if (SDL_HasIntersectionF(&i->hurtRect,&parryRect)){
                     Vec2f speed=GetSpeed(i->rect,
                         {rect.x+rect.w/2.f,rect.y+rect.h/2.f},300.f);
-                    parryTimer=0.5f;
+                    parryTimer=1.f;
                 }
             }
         }

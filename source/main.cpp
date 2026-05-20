@@ -50,6 +50,8 @@ void update(Room* room, SDL_Renderer* r, float dt) {
         return;
     }
 
+    spawncd1-=dt;
+
     SDL_SetRenderDrawColor(r, 0, 0, 0, 255);
     SDL_RenderClear(r);
 
@@ -70,6 +72,13 @@ void update(Room* room, SDL_Renderer* r, float dt) {
         }
     }
 
+    if (spawncd1<=0.f){
+        Enemy* e=new Enemy(&gravity,room->sprites,room->sprites[0]);
+        e->rect={300.f+rand()%1000,100.f,50.f,50.f};
+        room->sprites.push_back(e);
+        spawncd1=5.f;
+    }
+
     SDL_SetRenderDrawColor(r,255,255,255,255);
     SDL_RenderFillRectF(r,&mouseRect);
 
@@ -83,6 +92,7 @@ void Update(){
 }
 
 int main() {
+    srand(time(0));
     if (SDL_Init(SDL_INIT_VIDEO) != 0) {
         std::cerr << "SDL_Init Error: " << SDL_GetError() << std::endl;
         return 1;
@@ -129,8 +139,19 @@ int main() {
     Brick* b=new Brick(&gravity,location->rooms[0]->sprites);
     b->rect={0,700,1000,100};
     location->rooms[0]->sprites.push_back(b);
-    location->rooms[0]->sprites.push_back(
-        new Enemy(&gravity,location->rooms[0]->sprites,p));
+    for (int i=0;i<5;i++){
+        Enemy* e=new Enemy(&gravity,location->rooms[0]->sprites,p);
+        e->rect={300.f+rand()%1000,100.f,50.f,50.f};
+        location->rooms[0]->sprites.push_back(e);
+    }
+    {
+        Brick* b=new Brick(&gravity,location->rooms[0]->sprites);
+        b->rect={400,675,100,25};
+        location->rooms[0]->sprites.push_back(b);
+        b=new Brick(&gravity,location->rooms[0]->sprites);
+        b->rect={700,675,300,25};
+        location->rooms[0]->sprites.push_back(b);
+    }
     SDL_ShowCursor(SDL_DISABLE);
     SDL_SetRelativeMouseMode(SDL_TRUE);
 

@@ -1,3 +1,4 @@
+#pragma once
 #include <functional>
 #include "Sprite.hpp"
 #include "Entities.hpp"
@@ -61,10 +62,6 @@ class Sword:public Weapon{
                     }
                 }
             }
-            if (w->owner->dx>0)
-                w->owner->dx+=500;
-            else if (w->owner->dx<0)
-                w->owner->dx-=500;
             wep->cd=wep->maxCd;
         },
         [](Weapon* w){}
