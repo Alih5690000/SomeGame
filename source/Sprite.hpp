@@ -20,6 +20,7 @@ class Sprite{
     SDL_FRect hurtRect;
     SDL_Texture* txt;
     float* gravity;
+    float friction=1000.f;
     bool midAir=false;
     bool collidable=true;
     bool active=true;
@@ -67,11 +68,11 @@ class Sprite{
         gravity(gravity),sprites(s){}
     void MoveAndHandleX(float dt){
         if (dx>0){
-            dx-=1000*dt;
+            dx-=friction*dt;
             if (dx<0) dx=0;
         }
         else if (dx<0){
-            dx+=1000*dt;
+            dx+=friction*dt;
             if (dx>0) dx=0;
         }
         rect.x+=dx*dt;
