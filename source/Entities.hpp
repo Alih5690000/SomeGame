@@ -182,14 +182,11 @@ class Player:public Sprite{
             Sprite* i=sprites[j];
             if (i!=this){
                 if (SDL_HasIntersectionF(&i->hurtRect,&parryRect)){
-                    Vec2f speed=GetSpeed(i->rect,
-                        {rect.x+rect.w/2.f,rect.y+rect.h/2.f},300.f);
                     parryTimer=1.f;
                 }
             }
         }
         parryCd=0.5f;
-        E_held=true;
     }
     void HandleInput(const Uint8* state){
         if (state[SDL_SCANCODE_A]){
