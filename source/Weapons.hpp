@@ -45,7 +45,7 @@ class Sword:public Weapon{
     SDL_FRect hitRect;
     
     Sword(Sprite* o,std::function<void(Weapon*)> draw):Weapon(o,
-        [](Weapon* w){
+        [this](Weapon* w){
             Sword* wep=dynamic_cast<Sword*>(w);
             if (wep->cd>0) return;
             if (wep->owner->dx>0)
