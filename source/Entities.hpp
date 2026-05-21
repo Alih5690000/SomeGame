@@ -172,19 +172,6 @@ class Player:public Sprite{
         alive_take_dmg(dmg);
         took_dmg=true;
     }*/
-    void HandleParry(){
-        SDL_FRect parryRect={rect.x-50,rect.y-50,rect.w+100,rect.h+100};
-        size_t count=sprites.size();
-        for (size_t j=0;j<count;j++){
-            Sprite* i=sprites[j];
-            if (i!=this){
-                if (SDL_HasIntersectionF(&i->hurtRect,&parryRect)){
-                    parryTimer=1.f;
-                }
-            }
-        }
-        parryCd=0.5f;
-    }
     void HandleInput(const Uint8* state){
         if (state[SDL_SCANCODE_A]){
             if (dx>-200)
@@ -209,7 +196,8 @@ class Player:public Sprite{
         }
         isParrying=false;
         if (state[SDL_SCANCODE_E] && !E_held){
-            HandleParry();
+            parryTimer=0.3f;
+            parryCd=1.f;
         }
         else if (!state[SDL_SCANCODE_E]){
             E_held=false;
@@ -230,7 +218,8 @@ class Player:public Sprite{
         else{
             isParrying=false;
         }
-        if (parryCd>0.f){
+        render(r);
+        if (parryTimer>0.f){
             Y+=dt*rect.w*2;
             float X=0;
             if (dx<0){
@@ -263,7 +252,6 @@ class Player:public Sprite{
         else{
             txt=undmgdtxt;
         }
-        render(r);
     }
     ~Player(){
         SDL_DestroyTexture(undmgdtxt);
