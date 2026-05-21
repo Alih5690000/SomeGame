@@ -209,7 +209,8 @@ class Player:public Sprite{
         }
         isParrying=false;
         if (state[SDL_SCANCODE_E] && !E_held){
-            HandleParry();
+            parryTimer=0.3f;
+            parryCd=1.f;
         }
         else if (!state[SDL_SCANCODE_E]){
             E_held=false;
@@ -231,7 +232,8 @@ class Player:public Sprite{
         else{
             isParrying=false;
         }
-        if (parryCd>0.f){
+        render(r);
+        if (parryTimer>0.f){
             Y+=dt*rect.w*2;
             float X=0;
             if (dx<0){
@@ -264,7 +266,6 @@ class Player:public Sprite{
         else{
             txt=undmgdtxt;
         }
-        render(r);
     }
     ~Player(){
         SDL_DestroyTexture(undmgdtxt);

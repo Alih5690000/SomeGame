@@ -16,10 +16,11 @@ class Sprite{
     public:
     SDL_FRect rect;
     bool Ai=false;
-    float jumpboost=-100.f;
+    float jumpboost=-150.f;
     SDL_FRect hurtRect;
     SDL_Texture* txt;
     float* gravity;
+    float friction=1000.f;
     bool midAir=false;
     bool collidable=true;
     bool active=true;
@@ -101,8 +102,10 @@ class Sprite{
                         }
                     }
                     if (Ai && !midAir){
-                        dy=jumpboost;
-                        midAir=true;
+                        if (dy >= 0){
+                            dy=jumpboost;
+                            midAir=true;
+                        }
                     }
                 }
             }
@@ -110,12 +113,12 @@ class Sprite{
     }
     void MoveAndHandleY(float dt){
         rect.y+=dy*dt;
+        midAir=true;
         for (size_t j=0;j<sprites.size();j++){
             Sprite* i=sprites[j];
             if (i==this) continue;
             if (SDL_HasIntersectionF(&rect,&i->rect)){
                 if (collidable&&i->collidable){
-                    midAir=true;
                     if (dy>0){
                         if (weight>i->weight){
                             i->rect.y=rect.y+rect.h;
