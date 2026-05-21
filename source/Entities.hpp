@@ -185,7 +185,7 @@ class Player:public Sprite{
         }
         parryCd=0.5f;
     }
-    void HandleInput(const Uint8* state){
+    void HandleInput(const Uint8* state,Uint32 mouseState){
         if (state[SDL_SCANCODE_A]){
             if (dx>-200)
                 dx=-200;
@@ -198,10 +198,10 @@ class Player:public Sprite{
             dy=-250;
             midAir=true;
         }
-        if (state[SDL_SCANCODE_F]){
+        if (mouseState & SDL_BUTTON_LMASK){
             if (weapon) weapon->Use();
         }
-        if (state[SDL_SCANCODE_G]){
+        if (mouseState & SDL_BUTTON_RMASK){
             if (weapon) weapon->AltUse();
         }
         if (state[SDL_SCANCODE_R]){
@@ -223,7 +223,8 @@ class Player:public Sprite{
         parryTimer-=dt;
         if (parryTimer<0.f) parryTimer=0.f;
         const Uint8* state=SDL_GetKeyboardState(NULL);
-        HandleInput(state);
+        Uint32 mouseState=SDL_GetMouseState(NULL,NULL);
+        HandleInput(state,mouseState);
         if (parryTimer>0){
             isParrying=true;
         }

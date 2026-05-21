@@ -2,6 +2,7 @@
 #include <functional>
 #include "Sprite.hpp"
 #include "Entities.hpp"
+#include "Globals.hpp"
 
 class Weapon{
     public:
@@ -42,28 +43,30 @@ class Sword:public Weapon{
     float swordLength=40.f;
     float swordWidth=10.f;
     int dmg=100;
+    bool PlayerMode=false;
     
     Sword(Sprite* o,std::function<void(Weapon*)> draw):Weapon(o,
         [](Weapon* w){
             Sword* wep=dynamic_cast<Sword*>(w);
             if (wep->cd>0) return;
             SDL_FRect hitRect;
-            if (wep->owner->dx>0)
-                hitRect={w->owner->rect.x,w->owner->rect.y,
-                    w->owner->rect.w*2,w->owner->rect.h};
-            else if(wep->owner->dx<0)
-                hitRect={w->owner->rect.x-w->owner->rect.w*2,w->owner->rect.y,
-                    w->owner->rect.w*2,w->owner->rect.h};
-            if (!w->owner->sprites.empty()){
-                for (ptrdiff_t j=(ptrdiff_t)w->owner->sprites.size()-1;j>=0;--j){
-                    Sprite* i=w->owner->sprites[j];
-                    if (i!=w->owner){
-                        if (SDL_HasIntersectionF(&i->hurtRect,&hitRect)){
-                            w->owner->sprites.push_back(new HitSprite(0.f,hitRect,w->owner->gravity,w->owner->sprites,wep->dmg,true,w->owner));
-                        }
-                    }
-                }
+            if (!wep->PlayerMode){
+                if (wep->owner->dx>0)
+                    hitRect={w->owner->rect.x,w->owner->rect.y,
+                        w->owner->rect.w*2,w->owner->rect.h};
+                else if(wep->owner->dx<0)
+                    hitRect={w->owner->rect.x-w->owner->rect.w*2,w->owner->rect.y,
+                        w->owner->rect.w*2,w->owner->rect.h};
             }
+            else{
+                if (mouseRect.x>w->owner->rect.x+w->owner->rect.w/2)
+                    hitRect={w->owner->rect.x,w->owner->rect.y,
+                        w->owner->rect.w*2,w->owner->rect.h};
+                else if(mouseRect.x<w->owner->rect.x+w->owner->rect.w/2)
+                    hitRect={w->owner->rect.x-w->owner->rect.w*2,w->owner->rect.y,
+                        w->owner->rect.w*2,w->owner->rect.h};
+            }
+            w->owner->sprites.push_back(new HitSprite(0.f,hitRect,w->owner->gravity,w->owner->sprites,wep->dmg,true,w->owner));
             wep->cd=wep->maxCd;
         },
         [](Weapon* w){}

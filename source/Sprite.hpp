@@ -25,6 +25,7 @@ class Sprite{
     bool active=true;
     float dx,dy;
     int hp=100;
+    float lastDx=0.f;
     int mustGetDmg=0;
     float weight=1.f;
     bool isParrying=false;
@@ -34,10 +35,10 @@ class Sprite{
     void receiveDmg(){hp-=mustGetDmg;}
     virtual void post_update(SDL_Renderer*,float dt){receiveDmg();mustGetDmg=0;}
     virtual void render(SDL_Renderer* r){
-        if (dx>0){
+        if (lastDx>0){
             SDL_RenderCopyExF(r,txt,NULL,&rect,0,NULL,SDL_FLIP_HORIZONTAL);
         }
-        else if (dx<0){
+        else if (lastDx<0){
             SDL_RenderCopyExF(r,txt,NULL,&rect,0,NULL,SDL_FLIP_NONE);
         }
         else{
@@ -67,10 +68,12 @@ class Sprite{
         gravity(gravity),sprites(s){}
     void MoveAndHandleX(float dt){
         if (dx>0){
+            lastDx=dx;
             dx-=1000*dt;
             if (dx<0) dx=0;
         }
         else if (dx<0){
+            lastDx=dx;
             dx+=1000*dt;
             if (dx>0) dx=0;
         }
