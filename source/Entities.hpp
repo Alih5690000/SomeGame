@@ -41,6 +41,7 @@ public:
         ACTIVE_CHECK();
         setHurtbox();
         dy+=*gravity*dt;
+        parryRect=rect;
 
         MoveAndHandleX(dt);
         MoveAndHandleY(dt);
@@ -70,6 +71,7 @@ class Enemy:public Sprite{
     }
     void update(SDL_Renderer* r,float dt) override{
         ACTIVE_CHECK();
+        parryRect={rect.x-25,rect.y-25,rect.w+50,rect.h+50};
         setHurtbox();
         cd-=dt;
         if (cd<0) cd=0;
@@ -127,15 +129,16 @@ class Enemy:public Sprite{
 
 class Bullet:public Sprite{
     public:
-    float lifeTime;
     int dmg;
+    std::vector<Sprite*> mustDamage;
     Sprite* dealer;
+    bool parried=false;
     Vec2f dest;
-    Bullet(float l,
+    Bullet(
         SDL_FRect r,float* g,
         std::vector<Sprite*>& s,int d,Sprite* de,
         Vec2f destination)
-    :Sprite(g,s),lifeTime(l),dmg(d),dealer(de),dest(destination){
+    :Sprite(g,s),dmg(d),dealer(de),dest(destination){
         rect=r;
         collidable=false;
     }
@@ -146,26 +149,47 @@ class Bullet:public Sprite{
     void update(SDL_Renderer* r,float cd) override{
         ACTIVE_CHECK();
         setHurtbox();
-        lifeTime-=cd;
-        if (lifeTime<0.f) {
+        size_t count=sprites.size();
+        for (size_t j=0;j<count;j++){
+            if (sprites[j]==this || (sprites[j]==dealer && !parried)) 
+                continue;
+            if (SDL_HasIntersectionF(&sprites[j]->parryRect,&rect)){
+                mustDamage.push_back(sprites[j]);
+                emscripten_log(1,"Bullet hit something");
+            }
+        }
+        float distance=
+            sqrtf((dest.x-rect.x)*(dest.x-rect.x)+
+            (dest.y-rect.y)*(dest.y-rect.y));
+        if (distance<100*dt){
             active=false;
             return;
         }
-        size_t count=sprites.size();
-        for (size_t j=0;j<count;j++){
-            if (sprites[j]==this || sprites[j]==dealer) continue;
-            if (SDL_HasIntersectionF(&sprites[j]->hurtRect,&rect)){
-                sprites[j]->take_dmg(dmg);
-                active=false;
-                return;
-            }
-        }
-        Vec2f s=GetSpeed(rect,{dest.x,dest.y},300.f);
+        Vec2f s=GetSpeed(rect,{dest.x,dest.y},100.f);
         dx=s.x;
         dy=s.y;
         MoveAndHandleX(cd);
         MoveAndHandleY(cd);
         render(r);
+    }
+    void post_update(SDL_Renderer* r,float cd) override{
+        if (mustDamage.size()>0){
+            active=false;
+        }
+        else{
+            return;
+        }
+        for (auto i:mustDamage){
+            if (i->isParrying){
+                dest=i->pointingTo;
+                active=true;
+                parried=true;
+            }
+            else{
+                i->take_dmg(dmg);
+            }
+        }
+        mustDamage.clear();
     }
 };
 
@@ -188,6 +212,7 @@ class EnemyShooting:public Sprite{
     void update(SDL_Renderer* r,float dt) override{
         ACTIVE_CHECK();
         setHurtbox();
+        parryRect={rect.x-25,rect.y-25,rect.w+50,rect.h+50};
         cd-=dt;
         if (cd<0) cd=0;
         pointingTo={target->rect.x,target->rect.y};
@@ -202,7 +227,9 @@ class EnemyShooting:public Sprite{
         }
         float distance=sqrtf((target->rect.x-rect.x)*(target->rect.x-rect.x)+(target->rect.y-rect.y)*(target->rect.y-rect.y));
         if (distance<550 && cd==0){
-            sprites.push_back(new Bullet(5.f,hurtRect,gravity,sprites,20,this,pointingTo));
+            sprites.push_back(
+                new Bullet({hurtRect.x,hurtRect.y,10,10},
+                gravity,sprites,20,this,pointingTo));
             emscripten_log(1,"Spawned bullet");
             cd=2.f;
         }
@@ -308,6 +335,7 @@ class Player:public Sprite{
     void update(SDL_Renderer* r,float dt) override{
         ACTIVE_CHECK();
         setHurtbox();
+        parryRect={rect.x-25,rect.y-25,rect.w+50,rect.h+50};
         parryCd-=dt;
         if (parryCd<0.f) parryCd=0.f;
         parryTimer-=dt;
