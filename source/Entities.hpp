@@ -4,6 +4,7 @@
 #include "Sprite.hpp"
 #include "Locations.hpp"
 #include "Weapons.hpp"
+#include "Utils.hpp"
 
 class Dummy : public Sprite{
 public:
@@ -121,6 +122,85 @@ class Enemy:public Sprite{
         int color=(secondsPreparing/0.5f)*255;
         SDL_SetRenderDrawColor(r,color,color,255,255);
         SDL_RenderFillRectF(r,&rect);
+    }
+};
+
+class Bullet:public Sprite{
+    public:
+    float lifeTime;
+    int dmg;
+    Sprite* dealer;
+    Vec2f dest;
+    Bullet(float l,
+        SDL_FRect r,float* g,
+        std::vector<Sprite*>& s,int d,Sprite* de,
+        Vec2f destination)
+    :Sprite(g,s),lifeTime(l),dmg(d),dealer(de),dest(destination){
+        rect=r;
+        collidable=false;
+    }
+    void update(SDL_Renderer* r,float cd) override{
+        ACTIVE_CHECK();
+        setHurtbox();
+        lifeTime-=cd;
+        if (lifeTime<0.f) {
+            active=false;
+            return;
+        }
+        size_t count=sprites.size();
+        for (size_t j=0;j<count;j++){
+            if (sprites[j]==this || sprites[j]==dealer) continue;
+            if (SDL_HasIntersectionF(&sprites[j]->hurtRect,&rect)){
+                sprites[j]->take_dmg(dmg);
+                active=false;
+                return;
+            }
+        }
+        Vec2f s=GetSpeed(rect,{dest.x,dest.y},300.f);
+        dx=s.x;
+        dy=s.y;
+        MoveAndHandleX(cd);
+        MoveAndHandleY(cd);
+        render(r);
+    }
+};
+
+class EnemyShooting:public Sprite{
+    Sprite* target;
+    float cd=0.f;
+    public:
+    EnemyShooting(float* gravity,std::vector<Sprite*>& s,Sprite* t):
+    Sprite(gravity,s),target(t){
+        rect={500,300,50,50};
+        Ai=true;
+    }
+    void take_dmg(int dmg) override{
+        alive_take_dmg(dmg);
+    }
+    void update(SDL_Renderer* r,float dt) override{
+        ACTIVE_CHECK();
+        setHurtbox();
+        cd-=dt;
+        if (cd<0) cd=0;
+        dy+=*gravity*dt;
+        if (target->rect.x>rect.x){
+            if (dx<50)
+                dx+=50;
+        }
+        else if (target->rect.x<rect.x){
+            if (dx>-50)
+                dx-=50;
+        }
+        float distance=sqrtf((target->rect.x-rect.x)*(target->rect.x-rect.x)+(target->rect.y-rect.y)*(target->rect.y-rect.y));
+        if (distance<150 && cd==0){
+            Vec2f dest={target->rect.x+target->rect.w/2,target->rect.y+target->rect.h/2};
+            sprites.push_back(new Bullet(5.f,hurtRect,gravity,sprites,20,this,dest));
+            emscripten_log(1,"Spawned bullet");
+            cd=2.f;
+        }
+        MoveAndHandleX(dt);
+        MoveAndHandleY(dt);
+        render(r);
     }
 };
 
