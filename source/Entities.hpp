@@ -266,6 +266,7 @@ class Player:public Sprite{
         parryCd=0.5f;
     }
     void HandleInput(const Uint8* state,Uint32 mouseState){
+        pointingTo={mouseRect.x,mouseRect.y};
         if (state[SDL_SCANCODE_A]){
             if (dx>-200)
                 dx=-200;

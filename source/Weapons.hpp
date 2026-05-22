@@ -48,24 +48,15 @@ class Sword:public Weapon{
     Sword(Sprite* o,std::function<void(Weapon*)> draw):Weapon(o,
         [this](Weapon* w){
             Sword* wep=dynamic_cast<Sword*>(w);
-            if (wep->cd>0) return;
             SDL_FRect hitRect;
-            if (!wep->PlayerMode){
-                if (wep->owner->dx>0)
-                    hitRect={w->owner->rect.x,w->owner->rect.y,
-                        w->owner->rect.w*2,w->owner->rect.h};
-                else if(wep->owner->dx<0)
-                    hitRect={w->owner->rect.x-w->owner->rect.w*2,w->owner->rect.y,
-                        w->owner->rect.w*2,w->owner->rect.h};
-            }
-            else{
-                if (mouseRect.x>w->owner->rect.x+w->owner->rect.w/2)
-                    hitRect={w->owner->rect.x,w->owner->rect.y,
-                        w->owner->rect.w*2,w->owner->rect.h};
-                else if(mouseRect.x<w->owner->rect.x+w->owner->rect.w/2)
-                    hitRect={w->owner->rect.x-w->owner->rect.w*2,w->owner->rect.y,
-                        w->owner->rect.w*2,w->owner->rect.h};
-            }
+            if (wep->owner->pointingTo.x>
+                wep->owner->rect.x+wep->owner->rect.w/2.f)
+                hitRect={w->owner->rect.x,w->owner->rect.y,
+                    w->owner->rect.w*2,w->owner->rect.h};
+            else if(wep->owner->pointingTo.x<
+                wep->owner->rect.x+wep->owner->rect.w/2.f)
+                hitRect={w->owner->rect.x-w->owner->rect.w*2,w->owner->rect.y,
+                    w->owner->rect.w*2,w->owner->rect.h};
             w->owner->sprites.push_back(new HitSprite(0.f,hitRect,w->owner->gravity,w->owner->sprites,wep->dmg,true,w->owner));
             wep->cd=wep->maxCd;
         },

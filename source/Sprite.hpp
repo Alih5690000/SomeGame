@@ -16,6 +16,7 @@ class Sprite{
     public:
     SDL_FRect rect;
     bool Ai=false;
+    Vec2f pointingTo;
     float jumpboost=-150.f;
     SDL_FRect hurtRect;
     SDL_Texture* txt;
