@@ -139,6 +139,10 @@ class Bullet:public Sprite{
         rect=r;
         collidable=false;
     }
+    void render(SDL_Renderer* r) override{
+        SDL_SetRenderDrawColor(r,255,255,0,255);
+        SDL_RenderFillRectF(r,&rect);
+    }
     void update(SDL_Renderer* r,float cd) override{
         ACTIVE_CHECK();
         setHurtbox();
@@ -174,6 +178,10 @@ class EnemyShooting:public Sprite{
         rect={500,300,50,50};
         Ai=true;
     }
+    void render(SDL_Renderer* r) override{
+        SDL_SetRenderDrawColor(r,255,0,255,255);
+        SDL_RenderFillRectF(r,&rect);
+    }
     void take_dmg(int dmg) override{
         alive_take_dmg(dmg);
     }
@@ -182,6 +190,7 @@ class EnemyShooting:public Sprite{
         setHurtbox();
         cd-=dt;
         if (cd<0) cd=0;
+        pointingTo={target->rect.x,target->rect.y};
         dy+=*gravity*dt;
         if (target->rect.x>rect.x){
             if (dx<50)
@@ -192,9 +201,8 @@ class EnemyShooting:public Sprite{
                 dx-=50;
         }
         float distance=sqrtf((target->rect.x-rect.x)*(target->rect.x-rect.x)+(target->rect.y-rect.y)*(target->rect.y-rect.y));
-        if (distance<150 && cd==0){
-            Vec2f dest={target->rect.x+target->rect.w/2,target->rect.y+target->rect.h/2};
-            sprites.push_back(new Bullet(5.f,hurtRect,gravity,sprites,20,this,dest));
+        if (distance<550 && cd==0){
+            sprites.push_back(new Bullet(5.f,hurtRect,gravity,sprites,20,this,pointingTo));
             emscripten_log(1,"Spawned bullet");
             cd=2.f;
         }

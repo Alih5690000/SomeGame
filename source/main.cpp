@@ -153,6 +153,8 @@ int main() {
         b->rect={700,675,300,25};
         location->rooms[0]->sprites.push_back(b);
     }
+    location->rooms[0]->sprites.push_back(
+        new EnemyShooting(&gravity,location->rooms[0]->sprites,p));
     SDL_ShowCursor(SDL_DISABLE);
     SDL_SetRelativeMouseMode(SDL_TRUE);
 
