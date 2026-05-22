@@ -49,6 +49,7 @@ class Sword:public Weapon{
         [this](Weapon* w){
             Sword* wep=dynamic_cast<Sword*>(w);
             SDL_FRect hitRect;
+            if (wep->cd>0.f) return;
             if (wep->owner->pointingTo.x>
                 wep->owner->rect.x+wep->owner->rect.w/2.f)
                 hitRect={w->owner->rect.x,w->owner->rect.y,
