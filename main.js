@@ -68,7 +68,7 @@ var ENVIRONMENT_IS_SHELL = !ENVIRONMENT_IS_WEB && !ENVIRONMENT_IS_NODE && !ENVIR
 
 // --pre-jses are emitted after the Module integration code, so that they can
 // refer to Module (if they choose; they can also define Module)
-// include: C:\msys64\tmp\tmpcu6zyqhj.js
+// include: /tmp/tmpof7odcwn.js
 if (!Module["expectedDataFileDownloads"]) Module["expectedDataFileDownloads"] = 0;
 
 Module["expectedDataFileDownloads"]++;
@@ -196,23 +196,23 @@ Module["expectedDataFileDownloads"]++;
   });
 })();
 
-// end include: C:\msys64\tmp\tmpcu6zyqhj.js
-// include: C:\msys64\tmp\tmp5mt9b5nj.js
+// end include: /tmp/tmpof7odcwn.js
+// include: /tmp/tmpd33xulyx.js
 // All the pre-js content up to here must remain later on, we need to run
 // it.
 if ((typeof ENVIRONMENT_IS_WASM_WORKER != "undefined" && ENVIRONMENT_IS_WASM_WORKER) || (typeof ENVIRONMENT_IS_PTHREAD != "undefined" && ENVIRONMENT_IS_PTHREAD) || (typeof ENVIRONMENT_IS_AUDIO_WORKLET != "undefined" && ENVIRONMENT_IS_AUDIO_WORKLET)) Module["preRun"] = [];
 
 var necessaryPreJSTasks = Module["preRun"].slice();
 
-// end include: C:\msys64\tmp\tmp5mt9b5nj.js
-// include: C:\msys64\tmp\tmp2serqgt_.js
+// end include: /tmp/tmpd33xulyx.js
+// include: /tmp/tmpcdl89c3y.js
 if (!Module["preRun"]) throw "Module.preRun should exist because file support used it; did a pre-js delete it?";
 
 necessaryPreJSTasks.forEach(task => {
   if (Module["preRun"].indexOf(task) < 0) throw "All preRun tasks that exist before user pre-js code should remain after; did you replace Module or modify Module.preRun?";
 });
 
-// end include: C:\msys64\tmp\tmp2serqgt_.js
+// end include: /tmp/tmpcdl89c3y.js
 var arguments_ = [];
 
 var thisProgram = "./this.program";

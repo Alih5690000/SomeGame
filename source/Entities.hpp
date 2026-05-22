@@ -237,6 +237,7 @@ class Player:public Sprite{
     bool took_dmg=false;
     float Y=0;
     float E_held=false;
+    bool sliding=false;
     float parryTimer;
     float parryCd=0.f;
     Player(float* gravity,std::vector<Sprite*>& s):Sprite(gravity,s){
@@ -275,13 +276,27 @@ class Player:public Sprite{
     }
     void HandleInput(const Uint8* state,Uint32 mouseState){
         pointingTo={mouseRect.x,mouseRect.y};
+        int speed=200;
+        if (sliding){ 
+            if (rect.h==50){
+                rect.h=25;
+                rect.y+=25;
+            }
+            speed=400;
+        }
+        else{
+            if (rect.h==25) {
+                rect.h=50;
+                rect.y-=25;
+            }
+        }
         if (state[SDL_SCANCODE_A]){
-            if (dx>-200)
-                dx=-200;
+            if (dx>-speed)
+                dx=-speed;
         }
         else if (state[SDL_SCANCODE_D]){
-            if (dx<200)
-                dx=200;
+            if (dx<speed)
+                dx=speed;
         }
         if (state[SDL_SCANCODE_W] && !midAir){
             dy=-250;
@@ -295,6 +310,12 @@ class Player:public Sprite{
         }
         if (state[SDL_SCANCODE_R]){
             if (weapon) weapon->Reload();
+        }
+        if (state[SDL_SCANCODE_LSHIFT]){
+            sliding=true;
+        }
+        else{
+            sliding=false;
         }
         isParrying=false;
         if (state[SDL_SCANCODE_E] && !E_held){
