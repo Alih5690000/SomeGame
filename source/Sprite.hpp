@@ -73,12 +73,22 @@ class Sprite{
     void MoveAndHandleX(float dt){
         if (dx>0){
             lastDx=dx;
-            dx-=1000*dt;
+            if (midAir){
+                dx-=friction*dt/4;
+            }
+            else{
+                dx-=friction*dt;
+            }
             if (dx<0) dx=0;
         }
         else if (dx<0){
             lastDx=dx;
-            dx+=1000*dt;
+            if (midAir){
+                dx+=friction*dt/4;
+            }
+            else{
+                dx+=friction*dt;
+            }
             if (dx>0) dx=0;
         }
         rect.x+=dx*dt;
