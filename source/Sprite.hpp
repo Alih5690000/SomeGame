@@ -17,6 +17,7 @@ class Sprite{
     SDL_FRect parryRect;
     SDL_FRect rect;
     bool Ai=false;
+    float knockbackondmg=600.f;
     Vec2f pointingTo;
     float jumpboost=-150.f;
     SDL_FRect hurtRect;
@@ -207,6 +208,12 @@ class HitSprite:public Sprite{
             }
             else{
                 i->take_dmg(dmg);
+                if (rect.x > i->rect.x){
+                    i->dx=-i->knockbackondmg;
+                }
+                else{
+                    i->dx=i->knockbackondmg;
+                }
             }
         }
         mustDamage.clear();

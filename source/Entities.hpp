@@ -64,6 +64,7 @@ class Enemy:public Sprite{
     Enemy(float* gravity,std::vector<Sprite*>& s,Sprite* t):
     Sprite(gravity,s),target(t){
         rect={500,300,50,50};
+        hp=200;
         Ai=true;
     }
     void take_dmg(int dmg) override{
@@ -98,9 +99,9 @@ class Enemy:public Sprite{
             if (secondsPreparing>0.5f){
                 emscripten_log(1,"Attack!");
                 if (target->rect.x>rect.x)
-                    dx=400;
+                    dx+=400;
                 else
-                    dx=-400;
+                    dx-=400;
                 secondsPreparing=0.f;
                 attackState=false;
                 dashin=true;
@@ -112,7 +113,7 @@ class Enemy:public Sprite{
         if (SDL_HasIntersectionF(&hurtRect,&target->rect) && cd==0 && dashin){
             sprites.push_back(new HitSprite(0.f,hurtRect,gravity,sprites,20,true,this));
             emscripten_log(1,"Spawned hitbox");
-            dx=-dx*0.5f;
+            dx-=dx*0.5f;
             cd=1.f;
             dashin=false;
         }
@@ -158,14 +159,19 @@ class Bullet:public Sprite{
                 emscripten_log(1,"Bullet hit something");
             }
         }
-        float distance=
+        float speed = 100.f;
+
+        float distance =
             sqrtf((dest.x-rect.x)*(dest.x-rect.x)+
             (dest.y-rect.y)*(dest.y-rect.y));
-        if (distance<100*dt){
-            active=false;
+
+        if (distance <= speed * cd){
+            rect.x = dest.x;
+            rect.y = dest.y;
+            active = false;
             return;
         }
-        Vec2f s=GetSpeed(rect,{dest.x,dest.y},100.f);
+        Vec2f s=GetSpeed(rect,{dest.x,dest.y},speed);
         dx=s.x;
         dy=s.y;
         MoveAndHandleX(cd);
@@ -263,7 +269,8 @@ class Player:public Sprite{
     SDL_Texture* dmgdtxt;
     bool took_dmg=false;
     float Y=0;
-    float E_held=false;
+    bool E_held=false;
+    bool Mouse_held=false;
     bool sliding=false;
     float parryTimer;
     float parryCd=0.f;
@@ -271,6 +278,7 @@ class Player:public Sprite{
         rect={100,100,50,50};
         undmgdtxt=SDL_CreateTexture(renderer,SDL_PIXELFORMAT_RGBA8888,SDL_TEXTUREACCESS_TARGET,50,50);
         txt=undmgdtxt;
+        knockbackondmg=300.f;
         dmgdtxt=SDL_CreateTexture(renderer,SDL_PIXELFORMAT_RGBA8888,SDL_TEXTUREACCESS_TARGET,50,50);
         SDL_Texture* prev=SDL_GetRenderTarget(renderer);
         SDL_SetRenderTarget(renderer,txt);  
@@ -288,19 +296,6 @@ class Player:public Sprite{
         alive_take_dmg(dmg);
         took_dmg=true;
     }*/
-    void HandleParry(){
-        SDL_FRect parryRect={rect.x-50,rect.y-50,rect.w+100,rect.h+100};
-        size_t count=sprites.size();
-        for (size_t j=0;j<count;j++){
-            Sprite* i=sprites[j];
-            if (i!=this){
-                if (SDL_HasIntersectionF(&i->hurtRect,&parryRect)){
-                    parryTimer=1.f;
-                }
-            }
-        }
-        parryCd=0.5f;
-    }
     void HandleInput(const Uint8* state,Uint32 mouseState){
         pointingTo={mouseRect.x,mouseRect.y};
         int speed=200;
@@ -329,8 +324,12 @@ class Player:public Sprite{
             dy=-250;
             midAir=true;
         }
-        if (mouseState & SDL_BUTTON_LMASK){
+        if ((mouseState & SDL_BUTTON_LMASK) && !Mouse_held){
             if (weapon) weapon->Use();
+            Mouse_held=true;
+        }
+        else if (!(mouseState & SDL_BUTTON_LMASK)){
+            Mouse_held=false;
         }
         if (mouseState & SDL_BUTTON_RMASK){
             if (weapon) weapon->AltUse();
