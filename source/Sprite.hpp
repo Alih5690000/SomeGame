@@ -17,7 +17,6 @@ class Sprite{
     SDL_FRect parryRect;
     SDL_FRect rect;
     bool Ai=false;
-    float knockbackondmg=600.f;
     Vec2f pointingTo;
     float jumpboost=-150.f;
     SDL_FRect hurtRect;
@@ -165,9 +164,11 @@ class HitSprite:public Sprite{
     Sprite* dealer;
     bool oneFramed=false;
     size_t cycles=0;
+    float knockback=0.f;
     std::vector<Sprite*> mustDamage;
-    HitSprite(float l,SDL_FRect r,float* g,std::vector<Sprite*>& s,int d,bool o,Sprite* de)
-    :Sprite(g,s),lifeTime(l),dmg(d),oneFramed(o),dealer(de){
+    HitSprite(float l,SDL_FRect r,float* g,std::vector<Sprite*>& s,int d,bool o,Sprite* de,
+        float k=0.f)
+    :Sprite(g,s),lifeTime(l),dmg(d),oneFramed(o),dealer(de),knockback(k){
         rect=r;
         collidable=false;
     }
@@ -209,10 +210,10 @@ class HitSprite:public Sprite{
             else{
                 i->take_dmg(dmg);
                 if (rect.x > i->rect.x){
-                    i->dx=-i->knockbackondmg;
+                    i->dx=knockback;
                 }
                 else{
-                    i->dx=i->knockbackondmg;
+                    i->dx=knockback;
                 }
             }
         }

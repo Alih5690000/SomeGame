@@ -61,6 +61,7 @@ class Enemy:public Sprite{
     bool dashin=false;
     float secondsPreparing=0.f;
     bool attackState=false;
+    float maxSpeed=50.f;
     Enemy(float* gravity,std::vector<Sprite*>& s,Sprite* t):
     Sprite(gravity,s),target(t){
         rect={500,300,50,50};
@@ -82,16 +83,20 @@ class Enemy:public Sprite{
                 attackState=true;
             else 
                 attackState=false;
-            if (dx<50)
+            if (dx<50){
                 dx+=50;
+                dx=std::min(dx,maxSpeed);
+            }
         }
         else if (target->rect.x<rect.x){
             if (target->rect.x-rect.x>-200 && target->rect.y-rect.y<50 && target->rect.y-rect.y>-50 && cd==0)
                 attackState=true;
             else 
                 attackState=false;
-            if (dx>-50)
+            if (dx>-50){
                 dx-=50;
+                dx=std::max(dx,-maxSpeed);
+            }
         }
         if (attackState){
             emscripten_log(1,"Preparing attack");
@@ -111,7 +116,7 @@ class Enemy:public Sprite{
             secondsPreparing=0.f;
         }
         if (SDL_HasIntersectionF(&hurtRect,&target->rect) && cd==0 && dashin){
-            sprites.push_back(new HitSprite(0.f,hurtRect,gravity,sprites,20,true,this));
+            sprites.push_back(new HitSprite(0.f,hurtRect,gravity,sprites,20,true,this,200.f));
             emscripten_log(1,"Spawned hitbox");
             dx-=dx*0.5f;
             cd=1.f;
@@ -224,12 +229,12 @@ class EnemyShooting:public Sprite{
         pointingTo={target->rect.x,target->rect.y};
         dy+=*gravity*dt;
         if (target->rect.x>rect.x){
-            if (dx<50)
-                dx+=50;
+            dx+=50;
+            dx=std::min(dx,50.f);
         }
         else if (target->rect.x<rect.x){
-            if (dx>-50)
-                dx-=50;
+            dx-=50;
+            dx=std::max(dx,-50.f);
         }
         float distance=sqrtf((target->rect.x-rect.x)*(target->rect.x-rect.x)+(target->rect.y-rect.y)*(target->rect.y-rect.y));
         if (distance<550 && cd==0){
@@ -278,7 +283,6 @@ class Player:public Sprite{
         rect={100,100,50,50};
         undmgdtxt=SDL_CreateTexture(renderer,SDL_PIXELFORMAT_RGBA8888,SDL_TEXTUREACCESS_TARGET,50,50);
         txt=undmgdtxt;
-        knockbackondmg=300.f;
         dmgdtxt=SDL_CreateTexture(renderer,SDL_PIXELFORMAT_RGBA8888,SDL_TEXTUREACCESS_TARGET,50,50);
         SDL_Texture* prev=SDL_GetRenderTarget(renderer);
         SDL_SetRenderTarget(renderer,txt);  
@@ -298,7 +302,7 @@ class Player:public Sprite{
     }*/
     void HandleInput(const Uint8* state,Uint32 mouseState){
         pointingTo={mouseRect.x,mouseRect.y};
-        int speed=200;
+        float speed=200.f;
         if (sliding){ 
             if (rect.h==50){
                 rect.h=25;
@@ -313,15 +317,19 @@ class Player:public Sprite{
             }
         }
         if (state[SDL_SCANCODE_A]){
-            if (dx>-speed)
-                dx=-speed;
+            if (dx>-speed){
+                dx-=speed;
+                dx=std::max(dx,-speed);
+            }
         }
         else if (state[SDL_SCANCODE_D]){
-            if (dx<speed)
-                dx=speed;
+            if (dx<speed){  
+                dx+=speed;
+                dx=std::min(dx,speed);
+            }
         }
         if (state[SDL_SCANCODE_W] && !midAir){
-            dy=-250;
+            dy-=250;
             midAir=true;
         }
         if ((mouseState & SDL_BUTTON_LMASK) && !Mouse_held){
@@ -355,7 +363,7 @@ class Player:public Sprite{
     void update(SDL_Renderer* r,float dt) override{
         ACTIVE_CHECK();
         setHurtbox();
-        parryRect={rect.x-25,rect.y-25,rect.w+50,rect.h+50};
+        parryRect={rect.x-50,rect.y-50,rect.w+100,rect.h+100};
         parryCd-=dt;
         if (parryCd<0.f) parryCd=0.f;
         parryTimer-=dt;

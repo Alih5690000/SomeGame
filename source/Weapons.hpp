@@ -60,33 +60,41 @@ class Sword:public Weapon{
                 wep->owner->rect.x+wep->owner->rect.w/2.f)
                 wep->hitRect={w->owner->rect.x-w->owner->rect.w*2,w->owner->rect.y,
                     w->owner->rect.w*2,w->owner->rect.h};
-            w->owner->sprites.push_back(new HitSprite(0.f,
-                wep->hitRect,w->owner->gravity,
-                w->owner->sprites,wep->dmg,true,w->owner));
             if (wep->sinceLastHit<1.5f && wep->cd==0.f){
                 wep->combo++;
             }
             else{
                 wep->combo=0;
             }
+            float k=50.f;
             if (wep->combo==0){
-                wep->maxCd=1.f;
+                emscripten_log(1,"First hit");
                 wep->dmg=100;
+                wep->maxCd=0.5f;
             }
             else if (wep->combo==1){
-                wep->maxCd=0.5f;
+                emscripten_log(1,"Second hit");
                 wep->dmg=110;
-            }
-            else if (wep->combo==2){
-                wep->maxCd=0.35f;
-                wep->dmg=130;
+                k=150.f;
+                wep->maxCd=0.75f;
             }
             else{
-                wep->maxCd=0.25f;
-                wep->dmg=160;
+                emscripten_log(1,"Third hit");
+                wep->dmg=250.f;
+                k=300.f;
+                if (wep->owner->pointingTo.x>
+                    wep->owner->rect.x)
+                    wep->owner->dx+=500.f;
+                else
+                    wep->owner->dx-=500.f;
+                wep->combo=0;
+                wep->maxCd=1.5f;
             }
             wep->cd=wep->maxCd;
             wep->sinceLastHit=0.f;
+            w->owner->sprites.push_back(new HitSprite(0.f,
+                wep->hitRect,w->owner->gravity,
+                w->owner->sprites,wep->dmg,true,w->owner,k));
         },
         [](Weapon* w){}
         ,[](Weapon* w){}
