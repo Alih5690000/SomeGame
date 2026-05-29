@@ -140,11 +140,11 @@ int main() {
     Brick* b=new Brick(&gravity,location->rooms[0]->sprites);
     b->rect={0,700,1000,100};
     location->rooms[0]->sprites.push_back(b);
-    for (int i=0;i<5;i++){
+    /*for (int i=0;i<5;i++){
         Enemy* e=new Enemy(&gravity,location->rooms[0]->sprites,p);
         e->rect={300.f+rand()%1000,100.f,50.f,50.f};
         location->rooms[0]->sprites.push_back(e);
-    }
+    }*/
     {
         Brick* b=new Brick(&gravity,location->rooms[0]->sprites);
         b->rect={400,675,100,25};

@@ -43,23 +43,58 @@ class Sword:public Weapon{
     float swordLength=40.f;
     float swordWidth=10.f;
     int dmg=100;
+    float sinceLastHit=0.f;
+    int combo=0;
     bool PlayerMode=false;
+    SDL_FRect hitRect;
     
     Sword(Sprite* o):Weapon(o,
         [this](Weapon* w){
             Sword* wep=dynamic_cast<Sword*>(w);
-            SDL_FRect hitRect;
             if (wep->cd>0.f) return;
             if (wep->owner->pointingTo.x>
                 wep->owner->rect.x+wep->owner->rect.w/2.f)
-                hitRect={w->owner->rect.x,w->owner->rect.y,
+                wep->hitRect={w->owner->rect.x,w->owner->rect.y,
                     w->owner->rect.w*2,w->owner->rect.h};
             else if(wep->owner->pointingTo.x<
                 wep->owner->rect.x+wep->owner->rect.w/2.f)
-                hitRect={w->owner->rect.x-w->owner->rect.w*2,w->owner->rect.y,
+                wep->hitRect={w->owner->rect.x-w->owner->rect.w*2,w->owner->rect.y,
                     w->owner->rect.w*2,w->owner->rect.h};
-            w->owner->sprites.push_back(new HitSprite(0.f,hitRect,w->owner->gravity,w->owner->sprites,wep->dmg,true,w->owner));
+            if (wep->sinceLastHit<1.5f && wep->cd==0.f){
+                wep->combo++;
+            }
+            else{
+                wep->combo=0;
+            }
+            float k=50.f;
+            if (wep->combo==0){
+                emscripten_log(1,"First hit");
+                wep->dmg=100;
+                wep->maxCd=0.5f;
+            }
+            else if (wep->combo==1){
+                emscripten_log(1,"Second hit");
+                wep->dmg=110;
+                k=150.f;
+                wep->maxCd=0.75f;
+            }
+            else{
+                emscripten_log(1,"Third hit");
+                wep->dmg=250.f;
+                k=300.f;
+                if (wep->owner->pointingTo.x>
+                    wep->owner->rect.x)
+                    wep->owner->dx+=500.f;
+                else
+                    wep->owner->dx-=500.f;
+                wep->combo=0;
+                wep->maxCd=1.5f;
+            }
             wep->cd=wep->maxCd;
+            wep->sinceLastHit=0.f;
+            w->owner->sprites.push_back(new HitSprite(0.f,
+                wep->hitRect,w->owner->gravity,
+                w->owner->sprites,wep->dmg,true,w->owner,k));
         },
         [](Weapon* w){}
         ,[](Weapon* w){}
@@ -80,6 +115,7 @@ class Sword:public Weapon{
         [](Weapon* w,float dt){
             Sword* wep=dynamic_cast<Sword*>(w);
             wep->cd-=dt;
+            wep->sinceLastHit+=dt;
             wep->cd=std::max(wep->cd,0.f);
         }
     ){
@@ -97,7 +133,7 @@ class Gun:public Weapon{
         [this](Weapon* w){
             Gun* wep=dynamic_cast<Gun*>(w);
             if (wep->cd>0.f) return;
-            wep->owner->sprites.push_back(new Bullet(5.f,
+            wep->owner->sprites.push_back(new Bullet(
                 {wep->owner->rect.x+wep->owner->rect.w/2.f,wep->owner->rect.y+wep->owner->rect.h/2.f,10,10},wep->owner->gravity,
                 wep->owner->sprites,wep->dmg,wep->owner,wep->owner->pointingTo));
             wep->cd=wep->maxCd;

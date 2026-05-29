@@ -42,6 +42,7 @@ public:
         ACTIVE_CHECK();
         setHurtbox();
         dy+=*gravity*dt;
+        parryRect=rect;
 
         MoveAndHandleX(dt);
         MoveAndHandleY(dt);
@@ -61,9 +62,11 @@ class Enemy:public Sprite{
     bool dashin=false;
     float secondsPreparing=0.f;
     bool attackState=false;
+    float maxSpeed=50.f;
     Enemy(float* gravity,std::vector<Sprite*>& s,Sprite* t):
     Sprite(gravity,s),target(t){
         rect={500,300,50,50};
+        hp=200;
         Ai=true;
     }
     void take_dmg(int dmg) override{
@@ -71,6 +74,7 @@ class Enemy:public Sprite{
     }
     void update(SDL_Renderer* r,float dt) override{
         ACTIVE_CHECK();
+        parryRect={rect.x-25,rect.y-25,rect.w+50,rect.h+50};
         setHurtbox();
         cd-=dt;
         if (cd<0) cd=0;
@@ -80,16 +84,20 @@ class Enemy:public Sprite{
                 attackState=true;
             else 
                 attackState=false;
-            if (dx<50)
+            if (dx<50){
                 dx+=50;
+                dx=std::min(dx,maxSpeed);
+            }
         }
         else if (target->rect.x<rect.x){
             if (target->rect.x-rect.x>-200 && target->rect.y-rect.y<50 && target->rect.y-rect.y>-50 && cd==0)
                 attackState=true;
             else 
                 attackState=false;
-            if (dx>-50)
+            if (dx>-50){
                 dx-=50;
+                dx=std::max(dx,-maxSpeed);
+            }
         }
         if (attackState){
             emscripten_log(1,"Preparing attack");
@@ -97,9 +105,9 @@ class Enemy:public Sprite{
             if (secondsPreparing>0.5f){
                 emscripten_log(1,"Attack!");
                 if (target->rect.x>rect.x)
-                    dx=400;
+                    dx+=400;
                 else
-                    dx=-400;
+                    dx-=400;
                 secondsPreparing=0.f;
                 attackState=false;
                 dashin=true;
@@ -109,9 +117,9 @@ class Enemy:public Sprite{
             secondsPreparing=0.f;
         }
         if (SDL_HasIntersectionF(&hurtRect,&target->rect) && cd==0 && dashin){
-            sprites.push_back(new HitSprite(0.f,hurtRect,gravity,sprites,20,true,this));
+            sprites.push_back(new HitSprite(0.f,hurtRect,gravity,sprites,20,true,this,200.f));
             emscripten_log(1,"Spawned hitbox");
-            dx=-dx*0.5f;
+            dx-=dx*0.5f;
             cd=1.f;
             dashin=false;
         }
@@ -128,15 +136,16 @@ class Enemy:public Sprite{
 
 class Bullet:public Sprite{
     public:
-    float lifeTime;
     int dmg;
+    std::vector<Sprite*> mustDamage;
     Sprite* dealer;
+    bool parried=false;
     Vec2f dest;
-    Bullet(float l,
+    Bullet(
         SDL_FRect r,float* g,
         std::vector<Sprite*>& s,int d,Sprite* de,
         Vec2f destination)
-    :Sprite(g,s),lifeTime(l),dmg(d),dealer(de),dest(destination){
+    :Sprite(g,s),dmg(d),dealer(de),dest(destination){
         rect=r;
         collidable=false;
     }
@@ -147,31 +156,52 @@ class Bullet:public Sprite{
     void update(SDL_Renderer* r,float cd) override{
         ACTIVE_CHECK();
         setHurtbox();
-        lifeTime-=cd;
-        if (lifeTime<0.f) {
-            active=false;
-            return;
-        }
         size_t count=sprites.size();
         for (size_t j=0;j<count;j++){
-            if (sprites[j]==this || sprites[j]==dealer) continue;
-            if (SDL_HasIntersectionF(&sprites[j]->hurtRect,&rect)){
-                sprites[j]->take_dmg(dmg);
-                active=false;
-                return;
+            if (sprites[j]==this || (sprites[j]==dealer && !parried)) 
+                continue;
+            if (SDL_HasIntersectionF(&sprites[j]->parryRect,&rect)){
+                mustDamage.push_back(sprites[j]);
+                emscripten_log(1,"Bullet hit something");
             }
         }
-        float distance=sqrtf((dest.x-rect.x)*(dest.x-rect.x)+(dest.y-rect.y)*(dest.y-rect.y));
-        if (distance<300.f*dt){
-            active=false;
+        float speed = 100.f;
+
+        float distance =
+            sqrtf((dest.x-rect.x)*(dest.x-rect.x)+
+            (dest.y-rect.y)*(dest.y-rect.y));
+
+        if (distance <= speed * cd){
+            rect.x = dest.x;
+            rect.y = dest.y;
+            active = false;
             return;
         }
-        Vec2f s=GetSpeed(rect,{dest.x,dest.y},300.f);
+        Vec2f s=GetSpeed(rect,{dest.x,dest.y},speed);
         dx=s.x;
         dy=s.y;
         MoveAndHandleX(cd);
         MoveAndHandleY(cd);
         render(r);
+    }
+    void post_update(SDL_Renderer* r,float cd) override{
+        if (mustDamage.size()>0){
+            active=false;
+        }
+        else{
+            return;
+        }
+        for (auto i:mustDamage){
+            if (i->isParrying){
+                dest=i->pointingTo;
+                active=true;
+                parried=true;
+            }
+            else{
+                i->take_dmg(dmg);
+            }
+        }
+        mustDamage.clear();
     }
 };
 
@@ -194,21 +224,24 @@ class EnemyShooting:public Sprite{
     void update(SDL_Renderer* r,float dt) override{
         ACTIVE_CHECK();
         setHurtbox();
+        parryRect={rect.x-25,rect.y-25,rect.w+50,rect.h+50};
         cd-=dt;
         if (cd<0) cd=0;
         pointingTo={target->rect.x,target->rect.y};
         dy+=*gravity*dt;
         if (target->rect.x>rect.x){
-            if (dx<50)
-                dx+=50;
+            dx+=50;
+            dx=std::min(dx,50.f);
         }
         else if (target->rect.x<rect.x){
-            if (dx>-50)
-                dx-=50;
+            dx-=50;
+            dx=std::max(dx,-50.f);
         }
         float distance=sqrtf((target->rect.x-rect.x)*(target->rect.x-rect.x)+(target->rect.y-rect.y)*(target->rect.y-rect.y));
         if (distance<550 && cd==0){
-            sprites.push_back(new Bullet(5.f,hurtRect,gravity,sprites,20,this,pointingTo));
+            sprites.push_back(
+                new Bullet({hurtRect.x,hurtRect.y,10,10},
+                gravity,sprites,20,this,pointingTo));
             emscripten_log(1,"Spawned bullet");
             cd=2.f;
         }
@@ -243,7 +276,8 @@ class Player:public Sprite{
     SDL_Texture* dmgdtxt;
     bool took_dmg=false;
     float Y=0;
-    float E_held=false;
+    bool E_held=false;
+    bool Mouse_held=false;
     bool sliding=false;
     float parryTimer;
     float parryCd=0.f;

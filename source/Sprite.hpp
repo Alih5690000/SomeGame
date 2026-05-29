@@ -14,6 +14,7 @@ Particle* CreateParticle(float* fravity,
 
 class Sprite{
     public:
+    SDL_FRect parryRect;
     SDL_FRect rect;
     bool Ai=false;
     Vec2f pointingTo;
@@ -49,7 +50,8 @@ class Sprite{
     }
     virtual ~Sprite()=default;
     void setHurtbox(){
-        hurtRect={rect.x-10,rect.y-10,rect.w+20,rect.h+20};
+        hurtRect={rect.x-rect.w*0.1f,rect.y-rect.h*0.1f,
+            rect.w+rect.w*0.2f,rect.h+rect.h*0.2f};
     }
     void alive_take_dmg(int dmg){
         hp-=dmg;
@@ -162,9 +164,11 @@ class HitSprite:public Sprite{
     Sprite* dealer;
     bool oneFramed=false;
     size_t cycles=0;
+    float knockback=0.f;
     std::vector<Sprite*> mustDamage;
-    HitSprite(float l,SDL_FRect r,float* g,std::vector<Sprite*>& s,int d,bool o,Sprite* de)
-    :Sprite(g,s),lifeTime(l),dmg(d),oneFramed(o),dealer(de){
+    HitSprite(float l,SDL_FRect r,float* g,std::vector<Sprite*>& s,int d,bool o,Sprite* de,
+        float k=0.f)
+    :Sprite(g,s),lifeTime(l),dmg(d),oneFramed(o),dealer(de),knockback(k){
         rect=r;
         collidable=false;
     }
@@ -187,7 +191,7 @@ class HitSprite:public Sprite{
         size_t count=sprites.size();
         for (size_t j=0;j<count;j++){
             if (sprites[j]==this || sprites[j]==dealer) continue;
-            if (SDL_HasIntersectionF(&sprites[j]->hurtRect,&rect)){
+            if (SDL_HasIntersectionF(&sprites[j]->parryRect,&rect)){
                 mustDamage.push_back(sprites[j]);
                 emscripten_log(1,"Hit something");
             }
@@ -205,6 +209,12 @@ class HitSprite:public Sprite{
             }
             else{
                 i->take_dmg(dmg);
+                if (rect.x > i->rect.x){
+                    i->dx=knockback;
+                }
+                else{
+                    i->dx=knockback;
+                }
             }
         }
         mustDamage.clear();
