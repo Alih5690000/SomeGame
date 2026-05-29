@@ -3,8 +3,9 @@
 #include <emscripten/html5.h>
 #include "Sprite.hpp"
 #include "Locations.hpp"
-#include "Weapons.hpp"
 #include "Utils.hpp"
+
+class Weapon;
 
 class Dummy : public Sprite{
 public:
@@ -160,6 +161,11 @@ class Bullet:public Sprite{
                 return;
             }
         }
+        float distance=sqrtf((dest.x-rect.x)*(dest.x-rect.x)+(dest.y-rect.y)*(dest.y-rect.y));
+        if (distance<300.f*dt){
+            active=false;
+            return;
+        }
         Vec2f s=GetSpeed(rect,{dest.x,dest.y},300.f);
         dx=s.x;
         dy=s.y;
@@ -225,6 +231,7 @@ class Brick:public Sprite{
     }
     void update(SDL_Renderer* r,float dt) override{
         ACTIVE_CHECK();
+        setHurtbox();
         render(r);
     }
 };
@@ -274,111 +281,117 @@ class Player:public Sprite{
         }
         parryCd=0.5f;
     }
-    void HandleInput(const Uint8* state,Uint32 mouseState){
-        pointingTo={mouseRect.x,mouseRect.y};
-        int speed=200;
-        if (sliding){ 
-            if (rect.h==50){
-                rect.h=25;
-                rect.y+=25;
-            }
-            speed=400;
-        }
-        else{
-            if (rect.h==25) {
-                rect.h=50;
-                rect.y-=25;
-            }
-        }
-        if (state[SDL_SCANCODE_A]){
-            if (dx>-speed)
-                dx=-speed;
-        }
-        else if (state[SDL_SCANCODE_D]){
-            if (dx<speed)
-                dx=speed;
-        }
-        if (state[SDL_SCANCODE_W] && !midAir){
-            dy=-250;
-            midAir=true;
-        }
-        if (mouseState & SDL_BUTTON_LMASK){
-            if (weapon) weapon->Use();
-        }
-        if (mouseState & SDL_BUTTON_RMASK){
-            if (weapon) weapon->AltUse();
-        }
-        if (state[SDL_SCANCODE_R]){
-            if (weapon) weapon->Reload();
-        }
-        if (state[SDL_SCANCODE_LSHIFT]){
-            sliding=true;
-        }
-        else{
-            sliding=false;
-        }
-        isParrying=false;
-        if (state[SDL_SCANCODE_E] && !E_held){
-            parryTimer=0.3f;
-            parryCd=1.f;
-        }
-        else if (!state[SDL_SCANCODE_E]){
-            E_held=false;
-        }
-    }
-    void update(SDL_Renderer* r,float dt) override{
-        ACTIVE_CHECK();
-        setHurtbox();
-        parryCd-=dt;
-        if (parryCd<0.f) parryCd=0.f;
-        parryTimer-=dt;
-        if (parryTimer<0.f) parryTimer=0.f;
-        const Uint8* state=SDL_GetKeyboardState(NULL);
-        Uint32 mouseState=SDL_GetMouseState(NULL,NULL);
-        HandleInput(state,mouseState);
-        if (parryTimer>0){
-            isParrying=true;
-        }
-        else{
-            isParrying=false;
-        }
-        render(r);
-        if (parryTimer>0.f){
-            Y+=dt*rect.w*2;
-            float X=0;
-            if (dx<0){
-                X=rect.x-10;
-            }
-            else if (dx>0){
-                X=rect.x+rect.w+10;
-            }
-            else{
-                X=rect.x+rect.w/2;
-            }
-            SDL_FRect re={X,rect.y+Y,20,20};
-            SDL_SetRenderDrawColor(r,0,0,255,255);
-            SDL_RenderFillRectF(r,&re);
-        }
-        else{
-            Y=0;
-        }
-        if (weapon){
-            weapon->Update(dt);
-            weapon->Draw();
-        }
-        dy+=*gravity*dt;
-        MoveAndHandleX(dt);
-        MoveAndHandleY(dt);
-        if (took_dmg){
-            txt=dmgdtxt;
-            took_dmg=false;
-        }
-        else{
-            txt=undmgdtxt;
-        }
-    }
+    void HandleInput(const Uint8* state,Uint32 mouseState);
+    void update(SDL_Renderer* r,float dt) override;
     ~Player(){
         SDL_DestroyTexture(undmgdtxt);
         SDL_DestroyTexture(dmgdtxt);
     }
 };
+
+#include "Weapons.hpp"
+
+inline void Player::HandleInput(const Uint8* state,Uint32 mouseState){
+    pointingTo={mouseRect.x,mouseRect.y};
+    int speed=200;
+    if (sliding){ 
+        if (rect.h==50){
+            rect.h=25;
+            rect.y+=25;
+        }
+        speed=400;
+    }
+    else{
+        if (rect.h==25) {
+            rect.h=50;
+            rect.y-=25;
+        }
+    }
+    if (state[SDL_SCANCODE_A]){
+        if (dx>-speed)
+            dx=-speed;
+    }
+    else if (state[SDL_SCANCODE_D]){
+        if (dx<speed)
+            dx=speed;
+    }
+    if (state[SDL_SCANCODE_W] && !midAir){
+        dy=-250;
+        midAir=true;
+    }
+    if (mouseState & SDL_BUTTON_LMASK){
+        if (weapon) weapon->Use();
+    }
+    if (mouseState & SDL_BUTTON_RMASK){
+        if (weapon) weapon->AltUse();
+    }
+    if (state[SDL_SCANCODE_R]){
+        if (weapon) weapon->Reload();
+    }
+    if (state[SDL_SCANCODE_LSHIFT]){
+        sliding=true;
+    }
+    else{
+        sliding=false;
+    }
+    isParrying=false;
+    if (state[SDL_SCANCODE_E] && !E_held){
+        parryTimer=0.3f;
+        parryCd=1.f;
+    }
+    else if (!state[SDL_SCANCODE_E]){
+        E_held=false;
+    }
+}
+
+inline void Player::update(SDL_Renderer* r,float dt){
+    ACTIVE_CHECK();
+    setHurtbox();
+    parryCd-=dt;
+    if (parryCd<0.f) parryCd=0.f;
+    parryTimer-=dt;
+    if (parryTimer<0.f) parryTimer=0.f;
+    const Uint8* state=SDL_GetKeyboardState(NULL);
+    Uint32 mouseState=SDL_GetMouseState(NULL,NULL);
+    HandleInput(state,mouseState);
+    if (parryTimer>0){
+        isParrying=true;
+    }
+    else{
+        isParrying=false;
+    }
+    render(r);
+    if (parryTimer>0.f){
+        Y+=dt*rect.w*2;
+        float X=0;
+        if (dx<0){
+            X=rect.x-10;
+        }
+        else if (dx>0){
+            X=rect.x+rect.w+10;
+        }
+        else{
+            X=rect.x+rect.w/2;
+        }
+        SDL_FRect re={X,rect.y+Y,20,20};
+        SDL_SetRenderDrawColor(r,0,0,255,255);
+        SDL_RenderFillRectF(r,&re);
+    }
+    else{
+        Y=0;
+    }
+    if (weapon){
+        weapon->Update(dt);
+        weapon->Draw();
+    }
+    dy+=*gravity*dt;
+    MoveAndHandleX(dt);
+    MoveAndHandleY(dt);
+    if (took_dmg){
+        txt=dmgdtxt;
+        took_dmg=false;
+    }
+    else{
+        txt=undmgdtxt;
+    }
+}

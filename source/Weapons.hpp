@@ -45,7 +45,7 @@ class Sword:public Weapon{
     int dmg=100;
     bool PlayerMode=false;
     
-    Sword(Sprite* o,std::function<void(Weapon*)> draw):Weapon(o,
+    Sword(Sprite* o):Weapon(o,
         [this](Weapon* w){
             Sword* wep=dynamic_cast<Sword*>(w);
             SDL_FRect hitRect;
@@ -85,4 +85,78 @@ class Sword:public Weapon{
     ){
     }
     ~Sword()=default;
+};
+
+class Gun:public Weapon{
+    public:
+    float cd=0.f;
+    float maxCd=0.1f;
+    int dmg=20;
+    SDL_Texture* txt;
+    Gun(Sprite* o):Weapon(o,
+        [this](Weapon* w){
+            Gun* wep=dynamic_cast<Gun*>(w);
+            if (wep->cd>0.f) return;
+            wep->owner->sprites.push_back(new Bullet(5.f,
+                {wep->owner->rect.x+wep->owner->rect.w/2.f,wep->owner->rect.y+wep->owner->rect.h/2.f,10,10},wep->owner->gravity,
+                wep->owner->sprites,wep->dmg,wep->owner,wep->owner->pointingTo));
+            wep->cd=wep->maxCd;
+        },
+        [](Weapon* w){}
+        ,[](Weapon* w){}
+        ,[](Weapon* w){
+            Gun* wep = dynamic_cast<Gun*>(w);
+
+            float cx = wep->owner->rect.x + wep->owner->rect.w / 2.f;
+            float cy = wep->owner->rect.y + wep->owner->rect.h / 2.f;
+
+            float dx = wep->owner->pointingTo.x - cx;
+            float dy = wep->owner->pointingTo.y - cy;
+
+            float angleRad = atan2f(dy, dx);
+            float angleDeg = angleRad * 180.f / 3.14159f;
+
+            if (wep->owner->pointingTo.x > wep->owner->rect.x + wep->owner->rect.w / 2.f) {
+                SDL_RenderCopyExF(
+                renderer,
+                wep->txt,
+                NULL,
+                &wep->owner->rect,
+                angleDeg,
+                NULL,
+                SDL_FLIP_NONE
+                );
+            }
+            else{
+                SDL_RenderCopyExF(
+                renderer,
+                wep->txt,
+                NULL,
+                &wep->owner->rect,
+                angleDeg,
+                NULL,
+                SDL_FLIP_VERTICAL
+                );
+            }
+        }
+        ,[](Weapon* w,float dt){
+            Gun* wep=dynamic_cast<Gun*>(w);
+            wep->cd-=dt;
+            wep->cd=std::max(wep->cd,0.f);
+        }
+    ){
+        SDL_FRect FirstRect={0,0,5,10};
+        SDL_FRect SecondRect={0,0,20,5};
+        txt=SDL_CreateTexture(renderer,SDL_PIXELFORMAT_RGBA8888,SDL_TEXTUREACCESS_TARGET,20,20);
+        SDL_SetTextureBlendMode(txt,SDL_BLENDMODE_BLEND);
+        SDL_Texture* prev=SDL_GetRenderTarget(renderer);
+        SDL_SetRenderTarget(renderer,txt);
+        SDL_SetRenderDrawColor(renderer,0,0,0,0);
+        SDL_RenderClear(renderer);
+        SDL_SetRenderDrawColor(renderer,255,255,0,255);
+        SDL_RenderFillRectF(renderer,&FirstRect);
+        SDL_RenderFillRectF(renderer,&SecondRect);
+        SDL_SetRenderTarget(renderer,prev);
+    }
+    ~Gun()=default;
 };
