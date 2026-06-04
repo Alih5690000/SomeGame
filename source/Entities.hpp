@@ -165,7 +165,7 @@ class Bullet:public Sprite{
                 emscripten_log(1,"Bullet hit something");
             }
         }
-        float speed = 100.f;
+        float speed = 1000.f;
 
         float distance =
             sqrtf((dest.x-rect.x)*(dest.x-rect.x)+
