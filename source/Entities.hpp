@@ -66,7 +66,7 @@ class Enemy:public Sprite{
     Enemy(float* gravity,std::vector<Sprite*>& s,Sprite* t):
     Sprite(gravity,s),target(t){
         rect={500,300,50,50};
-        hp=200;
+        hp=100;
         Ai=true;
     }
     void take_dmg(int dmg) override{
@@ -140,12 +140,13 @@ class Bullet:public Sprite{
     std::vector<Sprite*> mustDamage;
     Sprite* dealer;
     bool parried=false;
+    float speed;
     Vec2f dest;
     Bullet(
         SDL_FRect r,float* g,
         std::vector<Sprite*>& s,int d,Sprite* de,
-        Vec2f destination)
-    :Sprite(g,s),dmg(d),dealer(de),dest(destination){
+        Vec2f destination,float spd)
+    :Sprite(g,s),dmg(d),dealer(de),dest(destination),speed(spd){
         rect=r;
         collidable=false;
     }
@@ -165,7 +166,6 @@ class Bullet:public Sprite{
                 emscripten_log(1,"Bullet hit something");
             }
         }
-        float speed = 1000.f;
 
         float distance =
             sqrtf((dest.x-rect.x)*(dest.x-rect.x)+
@@ -212,6 +212,7 @@ class EnemyShooting:public Sprite{
     EnemyShooting(float* gravity,std::vector<Sprite*>& s,Sprite* t):
     Sprite(gravity,s),target(t){
         rect={500,300,50,50};
+        hp=100;
         Ai=true;
     }
     void render(SDL_Renderer* r) override{
@@ -241,7 +242,7 @@ class EnemyShooting:public Sprite{
         if (distance<550 && cd==0){
             sprites.push_back(
                 new Bullet({hurtRect.x,hurtRect.y,10,10},
-                gravity,sprites,20,this,pointingTo));
+                gravity,sprites,20,this,pointingTo,400.f));
             emscripten_log(1,"Spawned bullet");
             cd=2.f;
         }
@@ -302,19 +303,6 @@ class Player:public Sprite{
         alive_take_dmg(dmg);
         took_dmg=true;
     }*/
-    void HandleParry(){
-        SDL_FRect parryRect={rect.x-50,rect.y-50,rect.w+100,rect.h+100};
-        size_t count=sprites.size();
-        for (size_t j=0;j<count;j++){
-            Sprite* i=sprites[j];
-            if (i!=this){
-                if (SDL_HasIntersectionF(&i->hurtRect,&parryRect)){
-                    parryTimer=1.f;
-                }
-            }
-        }
-        parryCd=0.5f;
-    }
     void HandleInput(const Uint8* state,Uint32 mouseState);
     void update(SDL_Renderer* r,float dt) override;
     ~Player(){
@@ -369,9 +357,10 @@ inline void Player::HandleInput(const Uint8* state,Uint32 mouseState){
         sliding=false;
     }
     isParrying=false;
-    if (state[SDL_SCANCODE_E] && !E_held){
-        parryTimer=0.3f;
+    if (state[SDL_SCANCODE_E] && !E_held && parryCd == 0.f){
+        parryTimer=1.f;
         parryCd=1.f;
+        E_held=true;
     }
     else if (!state[SDL_SCANCODE_E]){
         E_held=false;
@@ -385,6 +374,7 @@ inline void Player::update(SDL_Renderer* r,float dt){
     if (parryCd<0.f) parryCd=0.f;
     parryTimer-=dt;
     if (parryTimer<0.f) parryTimer=0.f;
+    parryRect={rect.x-25,rect.y-25,rect.w+50,rect.h+50};
     const Uint8* state=SDL_GetKeyboardState(NULL);
     Uint32 mouseState=SDL_GetMouseState(NULL,NULL);
     HandleInput(state,mouseState);

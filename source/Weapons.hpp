@@ -127,7 +127,7 @@ class Gun:public Weapon{
     public:
     float cd=0.f;
     float maxCd=0.1f;
-    int dmg=20;
+    int dmg=100;
     SDL_Texture* txt;
     Gun(Sprite* o):Weapon(o,
         [this](Weapon* w){
@@ -135,7 +135,7 @@ class Gun:public Weapon{
             if (wep->cd>0.f) return;
             wep->owner->sprites.push_back(new Bullet(
                 {wep->owner->rect.x+wep->owner->rect.w/2.f,wep->owner->rect.y+wep->owner->rect.h/2.f,10,10},wep->owner->gravity,
-                wep->owner->sprites,wep->dmg,wep->owner,wep->owner->pointingTo));
+                wep->owner->sprites,wep->dmg,wep->owner,wep->owner->pointingTo,1000));
             wep->cd=wep->maxCd;
         },
         [](Weapon* w){}
