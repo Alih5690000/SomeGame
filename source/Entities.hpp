@@ -158,11 +158,13 @@ class Bullet:public Sprite{
         ACTIVE_CHECK();
         setHurtbox();
         size_t count=sprites.size();
+        emscripten_log(1,"Sprites size %d",count);
         for (size_t j=0;j<count;j++){
             if (sprites[j]==this || (sprites[j]==dealer && !parried)) 
                 continue;
-            if (SDL_HasIntersectionF(&sprites[j]->parryRect,&rect)){
+            if (SDL_HasIntersectionF(&sprites[j]->parryRect,&rect) && (sprites[j]->collidable || sprites[j]->hp>0)){
                 mustDamage.push_back(sprites[j]);
+                active=false;
                 emscripten_log(1,"Bullet hit something");
             }
         }
@@ -185,10 +187,7 @@ class Bullet:public Sprite{
         render(r);
     }
     void post_update(SDL_Renderer* r,float cd) override{
-        if (mustDamage.size()>0){
-            active=false;
-        }
-        else{
+        if (mustDamage.size()<=0){
             return;
         }
         for (auto i:mustDamage){
@@ -266,6 +265,7 @@ class Brick:public Sprite{
     void update(SDL_Renderer* r,float dt) override{
         ACTIVE_CHECK();
         setHurtbox();
+        parryRect=rect;
         render(r);
     }
 };
@@ -277,6 +277,7 @@ class Player:public Sprite{
     SDL_Texture* dmgdtxt;
     bool took_dmg=false;
     float Y=0;
+    bool ShiftPressed=false;
     bool E_held=false;
     bool Mouse_held=false;
     bool sliding=false;
@@ -316,19 +317,6 @@ class Player:public Sprite{
 inline void Player::HandleInput(const Uint8* state,Uint32 mouseState){
     pointingTo={mouseRect.x,mouseRect.y};
     int speed=200;
-    if (sliding){ 
-        if (rect.h==50){
-            rect.h=25;
-            rect.y+=25;
-        }
-        speed=400;
-    }
-    else{
-        if (rect.h==25) {
-            rect.h=50;
-            rect.y-=25;
-        }
-    }
     if (state[SDL_SCANCODE_A]){
         if (dx>-speed)
             dx=-speed;
@@ -350,11 +338,16 @@ inline void Player::HandleInput(const Uint8* state,Uint32 mouseState){
     if (state[SDL_SCANCODE_R]){
         if (weapon) weapon->Reload();
     }
-    if (state[SDL_SCANCODE_LSHIFT]){
-        sliding=true;
+    if (state[SDL_SCANCODE_LSHIFT] && !ShiftPressed){
+        dy=0;
+        if (dx>0)
+            dx=speed*2.5f;
+        else
+            dx=-speed*2.5f;
+        ShiftPressed=true;
     }
-    else{
-        sliding=false;
+    else if (!state[SDL_SCANCODE_LSHIFT] && ShiftPressed){
+        ShiftPressed=false;
     }
     isParrying=false;
     if (state[SDL_SCANCODE_E] && !E_held && parryCd == 0.f){
@@ -386,7 +379,7 @@ inline void Player::update(SDL_Renderer* r,float dt){
     }
     render(r);
     if (parryTimer>0.f){
-        Y+=dt*rect.w*2;
+        Y+=dt*rect.w;
         float X=0;
         if (dx<0){
             X=rect.x-10;
