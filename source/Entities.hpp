@@ -141,12 +141,13 @@ class Bullet:public Sprite{
     Sprite* dealer;
     bool parried=false;
     float speed;
+    float knockback=200.f;
     Vec2f dest;
     Bullet(
         SDL_FRect r,float* g,
         std::vector<Sprite*>& s,int d,Sprite* de,
-        Vec2f destination,float spd)
-    :Sprite(g,s),dmg(d),dealer(de),dest(destination),speed(spd){
+        Vec2f destination,float spd,float k=200.f)
+    :Sprite(g,s),dmg(d),dealer(de),dest(destination),speed(spd),knockback(k){
         rect=r;
         collidable=false;
     }
@@ -198,6 +199,12 @@ class Bullet:public Sprite{
             }
             else{
                 i->take_dmg(dmg);
+                if (rect.x > i->rect.x){
+                    i->dx-=knockback;
+                }
+                else{
+                    i->dx+=knockback;
+                }
             }
         }
         mustDamage.clear();
@@ -276,13 +283,14 @@ class Player:public Sprite{
     SDL_Texture* undmgdtxt;
     SDL_Texture* dmgdtxt;
     bool took_dmg=false;
-    float Y=0;
     bool ShiftPressed=false;
     bool E_held=false;
     bool Mouse_held=false;
     bool sliding=false;
     float parryTimer;
     float parryCd=0.f;
+    float DashTimer=0.f;
+    float DashTime=0.5f;
     Player(float* gravity,std::vector<Sprite*>& s):Sprite(gravity,s){
         rect={100,100,50,50};
         undmgdtxt=SDL_CreateTexture(renderer,SDL_PIXELFORMAT_RGBA8888,SDL_TEXTUREACCESS_TARGET,50,50);
@@ -301,6 +309,7 @@ class Player:public Sprite{
         SDL_SetRenderTarget(renderer,prev);
     }
     /*void take_dmg(int dmg) override{
+        if (DashTimer>0.f) return;
         alive_take_dmg(dmg);
         took_dmg=true;
     }*/
@@ -339,11 +348,7 @@ inline void Player::HandleInput(const Uint8* state,Uint32 mouseState){
         if (weapon) weapon->Reload();
     }
     if (state[SDL_SCANCODE_LSHIFT] && !ShiftPressed){
-        dy=0;
-        if (dx>0)
-            dx=speed*2.5f;
-        else
-            dx=-speed*2.5f;
+        DashTimer=DashTime;
         ShiftPressed=true;
     }
     else if (!state[SDL_SCANCODE_LSHIFT] && ShiftPressed){
@@ -377,31 +382,23 @@ inline void Player::update(SDL_Renderer* r,float dt){
     else{
         isParrying=false;
     }
-    render(r);
-    if (parryTimer>0.f){
-        Y+=dt*rect.w;
-        float X=0;
-        if (dx<0){
-            X=rect.x-10;
-        }
-        else if (dx>0){
-            X=rect.x+rect.w+10;
-        }
-        else{
-            X=rect.x+rect.w/2;
-        }
-        SDL_FRect re={X,rect.y+Y,20,20};
-        SDL_SetRenderDrawColor(r,0,0,255,255);
-        SDL_RenderFillRectF(r,&re);
-    }
-    else{
-        Y=0;
-    }
+    if (DashTimer<=0.f)
+        render(r);
     if (weapon){
         weapon->Update(dt);
-        weapon->Draw();
+        if (DashTimer<=0.f)
+            weapon->Draw();
     }
     dy+=*gravity*dt;
+    if (DashTimer>0.f){
+        dy=0;
+        dx=(dx>0?250:-250);
+        DashTimer-=dt;
+        collidable=false;
+    }
+    else{
+        collidable=true;
+    }
     MoveAndHandleX(dt);
     MoveAndHandleY(dt);
     if (took_dmg){

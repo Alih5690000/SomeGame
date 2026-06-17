@@ -210,10 +210,10 @@ class HitSprite:public Sprite{
             else{
                 i->take_dmg(dmg);
                 if (rect.x > i->rect.x){
-                    i->dx=knockback;
+                    i->dx-=knockback;
                 }
                 else{
-                    i->dx=knockback;
+                    i->dx+=knockback;
                 }
             }
         }

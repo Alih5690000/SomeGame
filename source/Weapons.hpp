@@ -126,8 +126,8 @@ class Sword:public Weapon{
 class Gun:public Weapon{
     public:
     float cd=0.f;
-    float maxCd=0.1f;
-    int dmg=100;
+    float maxCd=0.75f;
+    int dmg=50;
     SDL_Texture* txt;
     Gun(Sprite* o):Weapon(o,
         [this](Weapon* w){
