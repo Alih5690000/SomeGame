@@ -290,7 +290,7 @@ class Player:public Sprite{
     float parryTimer;
     float parryCd=0.f;
     float DashTimer=0.f;
-    float DashTime=0.5f;
+    float DashTime=0.25f;
     Player(float* gravity,std::vector<Sprite*>& s):Sprite(gravity,s){
         rect={100,100,50,50};
         undmgdtxt=SDL_CreateTexture(renderer,SDL_PIXELFORMAT_RGBA8888,SDL_TEXTUREACCESS_TARGET,50,50);
@@ -382,8 +382,6 @@ inline void Player::update(SDL_Renderer* r,float dt){
     else{
         isParrying=false;
     }
-    if (DashTimer<=0.f)
-        render(r);
     if (weapon){
         weapon->Update(dt);
         if (DashTimer<=0.f)
@@ -392,7 +390,7 @@ inline void Player::update(SDL_Renderer* r,float dt){
     dy+=*gravity*dt;
     if (DashTimer>0.f){
         dy=0;
-        dx=(dx>0?250:-250);
+        dx=(dx>0?500:-500);
         DashTimer-=dt;
         collidable=false;
     }
@@ -401,6 +399,10 @@ inline void Player::update(SDL_Renderer* r,float dt){
     }
     MoveAndHandleX(dt);
     MoveAndHandleY(dt);
+
+    if (DashTimer<=0.f)
+        render(r);
+    
     if (took_dmg){
         txt=dmgdtxt;
         took_dmg=false;
