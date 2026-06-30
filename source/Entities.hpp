@@ -4,6 +4,7 @@
 #include "Sprite.hpp"
 #include "Locations.hpp"
 #include "Utils.hpp"
+#include "vid.h"
 
 class Weapon;
 
@@ -279,6 +280,8 @@ class Brick:public Sprite{
 
 class Player:public Sprite{
     public:
+    enum class States{IDLE, WALK} ;
+    Video* Anims[2];
     Weapon* weapon;
     SDL_Texture* undmgdtxt;
     SDL_Texture* dmgdtxt;
