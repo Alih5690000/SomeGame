@@ -280,8 +280,9 @@ class Brick:public Sprite{
 
 class Player:public Sprite{
     public:
-    enum class States{IDLE, WALK} ;
-    Video* Anims[2];
+    enum class States{IDLE, WALK, MIDAIR} ;
+    Video* Anims[3];
+    Video* LegAnims[3]
     Weapon* weapon;
     SDL_Texture* undmgdtxt;
     SDL_Texture* dmgdtxt;
