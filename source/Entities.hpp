@@ -280,6 +280,7 @@ class Brick:public Sprite{
 
 class Player:public Sprite{
     public:
+    //body will be drawn by weapon draw
     enum class States{IDLE, WALK, MIDAIR} ;
     Video* Anims[3];
     Video* LegAnims[3]
