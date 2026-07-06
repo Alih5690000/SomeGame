@@ -7,6 +7,8 @@
 class Weapon{
     public:
     Sprite* owner;
+    SDL_Texture* body;
+    SDL_Texture* arm;
     std::function<void(Weapon*)> onUse;
     std::function<void(Weapon*)> onAltUse;
     std::function<void(Weapon*)> reload;
