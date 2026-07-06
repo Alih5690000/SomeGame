@@ -9,6 +9,9 @@ class Weapon{
     Sprite* owner;
     SDL_Texture* body;
     SDL_Texture* arm;
+    Vec2f IdleOffset;
+    Vec2f MovingOffset:
+    //Also needs jump anim resolve
     std::function<void(Weapon*)> onUse;
     std::function<void(Weapon*)> onAltUse;
     std::function<void(Weapon*)> reload;
@@ -21,6 +24,21 @@ class Weapon{
         std::function<void(Weapon*,float)> update):
             owner(owner),onUse(onUse),onAltUse(onAltUse),reload(reload),draw(draw),update(update){}
     virtual ~Weapon()=default;
+    //In development
+    void _Draw(){
+        if (owner->dx==0.f){
+            //Draw with Idle offset
+        }
+        if (owner->dx<0.f){
+            //Draw with inverted Moving offset
+        }
+        if (owner->dx>0.f){
+            //Draw with Moving offset
+        }
+        if (owner->dy<0.f){
+            //Jump anim
+        }
+    }
     void Use(){
         onUse(this);
     }
