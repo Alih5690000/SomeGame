@@ -1,7 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include <SDL_image.h>
+#include <SDL2/SDL_image.h>
 #include <emscripten/html5.h>
 #include "vec.c"
 
@@ -183,7 +183,7 @@ int Video_getLoops(Video* v){
 }
 
 Video* Video_CopyShallow(Video* o){
-    Video* res=malloc(sizeof(Video));
+    Video* res=(Video*)malloc(sizeof(Video));
     res->renderer=o->renderer;
     res->fps=o->fps;
     res->acc=0.f;
@@ -202,7 +202,7 @@ Video* Video_CopyShallow(Video* o){
 
 
 Video* Video_CopyDeep(Video* o){
-    Video* res=malloc(sizeof(Video));
+    Video* res=(Video*)malloc(sizeof(Video));
     res->renderer=o->renderer;
     res->fps=o->fps;
     res->acc=o->acc;

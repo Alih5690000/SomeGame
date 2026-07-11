@@ -3,14 +3,14 @@
 #include "Sprite.hpp"
 #include "Entities.hpp"
 #include "Globals.hpp"
+#include <cmath>
 
 class Weapon{
     public:
     Sprite* owner;
     SDL_Texture* body;
     SDL_Texture* arm;
-    Vec2f IdleOffset;
-    Vec2f MovingOffset:
+    Vec2f MovingOffset;//for arm
     //Also needs jump anim resolve
     std::function<void(Weapon*)> onUse;
     std::function<void(Weapon*)> onAltUse;
@@ -26,22 +26,25 @@ class Weapon{
     virtual ~Weapon()=default;
     //In development
     void _Draw(){
+        SDL_RenderCopyF(renderer,body,NULL,&owner->rect);
+        float angle=std::atan2(owner->pointingTo.y-(owner->rect.y+owner->rect.h/2.f),
+                owner->pointingTo.x-(owner->rect.x+owner->rect.w/2.f))*180.f/3.14159f;
         if (owner->dx==0.f){
-            //Draw with Idle offset
+            SDL_RenderCopyExF(renderer,arm,NULL,&owner->rect,angle,NULL,SDL_FLIP_NONE);
         }
         if (owner->dx<0.f){
-            //Draw with inverted Moving offset
+            SDL_FRect rect={owner->rect.x-MovingOffset.x,owner->rect.y-MovingOffset.y,owner->rect.w,owner->rect.h};
+            SDL_RenderCopyExF(renderer,arm,NULL,&rect,angle,NULL,SDL_FLIP_NONE);
         }
         if (owner->dx>0.f){
-            //Draw with Moving offset
-        }
-        if (owner->dy<0.f){
-            //Jump anim
+            SDL_FRect rect={owner->rect.x+MovingOffset.x,owner->rect.y+MovingOffset.y,owner->rect.w,owner->rect.h};
+            SDL_RenderCopyExF(renderer,arm,NULL,&rect,angle,NULL,SDL_FLIP_NONE);
         }
     }
     void Use(){
         onUse(this);
     }
+    [[deprecated("Dont call this one pls, implement render through angle and body and arm texture")]]
     void Draw(){
         draw(this);
     }
@@ -127,8 +130,8 @@ class Sword:public Weapon{
             float radians=angle*3.14159f/180.f;
             float sx=w->owner->rect.x+w->owner->rect.w/2.f;
             float sy=w->owner->rect.y+w->owner->rect.h/2.f;
-            float ex=sx+cosf(radians)*wep->swordLength;
-            float ey=sy+sinf(radians)*wep->swordLength;
+            float ex=sx+std::cos(radians)*wep->swordLength;
+            float ey=sy+std::sin(radians)*wep->swordLength;
             SDL_SetRenderDrawColor(renderer,255,255,0,255);
             SDL_RenderDrawLineF(renderer,sx,sy,ex,ey);
         },
@@ -136,7 +139,7 @@ class Sword:public Weapon{
             Sword* wep=dynamic_cast<Sword*>(w);
             wep->cd-=dt;
             wep->sinceLastHit+=dt;
-            wep->cd=std::max(wep->cd,0.f);
+            wep->cd=std::max<float>(wep->cd,0.f);
         }
     ){
     }
@@ -169,7 +172,7 @@ class Gun:public Weapon{
             float dx = wep->owner->pointingTo.x - cx;
             float dy = wep->owner->pointingTo.y - cy;
 
-            float angleRad = atan2f(dy, dx);
+            float angleRad = std::atan2(dy, dx);
             float angleDeg = angleRad * 180.f / 3.14159f;
 
             if (wep->owner->pointingTo.x > wep->owner->rect.x + wep->owner->rect.w / 2.f) {
@@ -198,7 +201,7 @@ class Gun:public Weapon{
         ,[](Weapon* w,float dt){
             Gun* wep=dynamic_cast<Gun*>(w);
             wep->cd-=dt;
-            wep->cd=std::max(wep->cd,0.f);
+            wep->cd=std::max<float>(wep->cd,0.f);
         }
     ){
         SDL_FRect FirstRect={0,0,5,10};

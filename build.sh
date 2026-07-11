@@ -1,4 +1,4 @@
-em++.bat source/main.cpp -o main.html \
+em++ source/main.cpp -o main.html \
   -s USE_SDL=2 \
   -s USE_SDL_TTF=2 \
   -s USE_SDL_IMAGE=2 \

@@ -282,8 +282,8 @@ class Player:public Sprite{
     public:
     //body will be drawn by weapon draw
     enum class States{IDLE, WALK, MIDAIR} ;
-    Video* Anims[3];
-    Video* LegAnims[3]
+    Video* LegAnims[3];
+    States CurrState;
     Weapon* weapon;
     SDL_Texture* undmgdtxt;
     SDL_Texture* dmgdtxt;
@@ -323,6 +323,9 @@ class Player:public Sprite{
     ~Player(){
         SDL_DestroyTexture(undmgdtxt);
         SDL_DestroyTexture(dmgdtxt);
+    }
+    void render(SDL_Renderer* r) override{
+        SDL_RenderCopyF(r,txt,NULL,&rect);
     }
 };
 
@@ -405,8 +408,16 @@ inline void Player::update(SDL_Renderer* r,float dt){
     MoveAndHandleX(dt);
     MoveAndHandleY(dt);
 
-    if (DashTimer<=0.f)
+    if (DashTimer<=0.f){
         render(r);
+        weapon->Draw();
+    }
+
+    for (int i=0;i<3;i++){
+        if (i!=(int)CurrState){
+            Video_setPos(LegAnims[i],0);
+        }
+    }
     
     if (took_dmg){
         txt=dmgdtxt;
