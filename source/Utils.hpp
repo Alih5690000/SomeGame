@@ -20,7 +20,7 @@ Vec2f GetSpeed(SDL_FRect& object, const SDL_FPoint& destination, float speed)
     float dx = destination.x - centerX;
     float dy = destination.y - centerY;
 
-    float distance = sqrtf(dx * dx + dy * dy);
+    float distance = std::sqrt(dx * dx + dy * dy);
 
     if (distance <= 0.001f)
         return {0.f, 0.f};

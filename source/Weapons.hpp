@@ -3,14 +3,16 @@
 #include "Sprite.hpp"
 #include "Entities.hpp"
 #include "Globals.hpp"
-#include <cmath>
+#include <math.h>
 
 class Weapon{
     public:
     Sprite* owner;
     SDL_Texture* body;
     SDL_Texture* arm;
-    Vec2f MovingOffset;//for arm
+    SDL_Texture* head;
+    Vec2f Arm_MovingOffset;
+    Vec2f Head_MovingOffset;
     //Also needs jump anim resolve
     std::function<void(Weapon*)> onUse;
     std::function<void(Weapon*)> onAltUse;
@@ -22,7 +24,25 @@ class Weapon{
         std::function<void(Weapon*)> reload,
         std::function<void(Weapon*)> draw,
         std::function<void(Weapon*,float)> update):
-            owner(owner),onUse(onUse),onAltUse(onAltUse),reload(reload),draw(draw),update(update){}
+            owner(owner),onUse(onUse),onAltUse(onAltUse),reload(reload),draw(draw),update(update){
+                //temporary decision
+                body=SDL_CreateTexture(renderer,SDL_PIXELFORMAT_RGBA8888,SDL_TEXTUREACCESS_TARGET,owner->rect.w,owner->rect.h);
+                arm=SDL_CreateTexture(renderer,SDL_PIXELFORMAT_RGBA8888,SDL_TEXTUREACCESS_TARGET
+                    ,10,10);
+                head=SDL_CreateTexture(renderer,SDL_PIXELFORMAT_RGBA8888,SDL_TEXTUREACCESS_TARGET
+                    ,5,5);
+                SDL_Texture* prev=SDL_GetRenderTarget(renderer);
+                SDL_SetRenderTarget(renderer,body);
+                SDL_SetRenderDrawColor(renderer,255,0,0,0);
+                SDL_RenderClear(renderer);
+                SDL_SetRenderTarget(renderer,arm);
+                SDL_SetRenderDrawColor(renderer,0,255,0,0);
+                SDL_RenderClear(renderer);
+                SDL_SetRenderTarget(renderer,head);
+                SDL_SetRenderDrawColor(renderer,0,0,255,0);
+                SDL_RenderClear(renderer);
+                SDL_SetRenderTarget(renderer,prev);
+            }
     virtual ~Weapon()=default;
     //In development
     void _Draw(){
@@ -33,11 +53,11 @@ class Weapon{
             SDL_RenderCopyExF(renderer,arm,NULL,&owner->rect,angle,NULL,SDL_FLIP_NONE);
         }
         if (owner->dx<0.f){
-            SDL_FRect rect={owner->rect.x-MovingOffset.x,owner->rect.y-MovingOffset.y,owner->rect.w,owner->rect.h};
+            SDL_FRect rect={owner->rect.x-Arm_MovingOffset.x,owner->rect.y-Arm_MovingOffset.y,owner->rect.w,owner->rect.h};
             SDL_RenderCopyExF(renderer,arm,NULL,&rect,angle,NULL,SDL_FLIP_NONE);
         }
         if (owner->dx>0.f){
-            SDL_FRect rect={owner->rect.x+MovingOffset.x,owner->rect.y+MovingOffset.y,owner->rect.w,owner->rect.h};
+            SDL_FRect rect={owner->rect.x+Arm_MovingOffset.x,owner->rect.y+Arm_MovingOffset.y,owner->rect.w,owner->rect.h};
             SDL_RenderCopyExF(renderer,arm,NULL,&rect,angle,NULL,SDL_FLIP_NONE);
         }
     }
@@ -46,7 +66,7 @@ class Weapon{
     }
     [[deprecated("Dont call this one pls, implement render through angle and body and arm texture")]]
     void Draw(){
-        draw(this);
+        _Draw();
     }
     void AltUse(){
         onAltUse(this);

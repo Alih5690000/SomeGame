@@ -133,7 +133,6 @@ int main() {
     Player* p=new Player(
         &gravity,location->rooms[0]->sprites);
     p->weapon=new Gun(p);
-    ((Sword*)p->weapon)->PlayerMode=true;
     location->rooms[0]->sprites.push_back(p);
     location->rooms[0]->sprites.push_back(new Brick(
         &gravity,location->rooms[0]->sprites));

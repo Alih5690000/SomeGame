@@ -9,4 +9,5 @@ float spawncd1=3.f;
 int start,end;
 SDL_Window* window = nullptr;
 bool running = true;
+
 SDL_Renderer* renderer = nullptr;

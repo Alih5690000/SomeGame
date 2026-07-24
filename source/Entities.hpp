@@ -87,7 +87,7 @@ class Enemy:public Sprite{
                 attackState=false;
             if (dx<50){
                 dx+=50;
-                dx=std::min(dx,maxSpeed);
+                dx=std::min<float>(dx,maxSpeed);
             }
         }
         else if (target->rect.x<rect.x){
@@ -97,7 +97,7 @@ class Enemy:public Sprite{
                 attackState=false;
             if (dx>-50){
                 dx-=50;
-                dx=std::max(dx,-maxSpeed);
+                dx=std::max<float>(dx,-maxSpeed);
             }
         }
         if (attackState){
@@ -172,7 +172,7 @@ class Bullet:public Sprite{
         }
 
         float distance =
-            sqrtf((dest.x-rect.x)*(dest.x-rect.x)+
+            std::sqrt((dest.x-rect.x)*(dest.x-rect.x)+
             (dest.y-rect.y)*(dest.y-rect.y));
 
         if (distance <= speed * cd){
@@ -208,7 +208,7 @@ class Bullet:public Sprite{
                 }
             }
         }
-        mustDamage.clear();
+        mustDamage={};
     }
 };
 
@@ -239,13 +239,13 @@ class EnemyShooting:public Sprite{
         dy+=*gravity*dt;
         if (target->rect.x>rect.x){
             dx+=50;
-            dx=std::min(dx,50.f);
+            dx=std::min<float>(dx,50.f);
         }
         else if (target->rect.x<rect.x){
             dx-=50;
-            dx=std::max(dx,-50.f);
+            dx=std::max<float>(dx,-50.f);
         }
-        float distance=sqrtf((target->rect.x-rect.x)*(target->rect.x-rect.x)+(target->rect.y-rect.y)*(target->rect.y-rect.y));
+        float distance=std::sqrt((target->rect.x-rect.x)*(target->rect.x-rect.x)+(target->rect.y-rect.y)*(target->rect.y-rect.y));
         if (distance<550 && cd==0){
             sprites.push_back(
                 new Bullet({hurtRect.x,hurtRect.y,10,10},
@@ -298,6 +298,9 @@ class Player:public Sprite{
     float DashTime=0.25f;
     Player(float* gravity,std::vector<Sprite*>& s):Sprite(gravity,s){
         rect={100,100,50,50};
+        LegAnims[0] = nullptr;
+        LegAnims[1] = nullptr;
+        LegAnims[2] = nullptr;
         undmgdtxt=SDL_CreateTexture(renderer,SDL_PIXELFORMAT_RGBA8888,SDL_TEXTUREACCESS_TARGET,50,50);
         txt=undmgdtxt;
         dmgdtxt=SDL_CreateTexture(renderer,SDL_PIXELFORMAT_RGBA8888,SDL_TEXTUREACCESS_TARGET,50,50);
@@ -325,7 +328,12 @@ class Player:public Sprite{
         SDL_DestroyTexture(dmgdtxt);
     }
     void render(SDL_Renderer* r) override{
-        SDL_RenderCopyF(r,txt,NULL,&rect);
+        if (pointingTo.x>rect.x+rect.w/2.f){
+            SDL_RenderCopyExF(r,txt,NULL,&rect,0.f,NULL,SDL_FLIP_NONE);
+        }
+        else{
+            SDL_RenderCopyExF(r,txt,NULL,&rect,0.f,NULL,SDL_FLIP_VERTICAL);
+        }
     }
 };
 
@@ -414,7 +422,7 @@ inline void Player::update(SDL_Renderer* r,float dt){
     }
 
     for (int i=0;i<3;i++){
-        if (i!=(int)CurrState){
+        if (i!=(int)CurrState && LegAnims[i]){
             Video_setPos(LegAnims[i],0);
         }
     }

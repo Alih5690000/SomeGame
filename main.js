@@ -68,7 +68,7 @@ var ENVIRONMENT_IS_SHELL = !ENVIRONMENT_IS_WEB && !ENVIRONMENT_IS_NODE && !ENVIR
 
 // --pre-jses are emitted after the Module integration code, so that they can
 // refer to Module (if they choose; they can also define Module)
-// include: /tmp/tmp7ztlj14z.js
+// include: /tmp/tmpj996o66w.js
 if (!Module["expectedDataFileDownloads"]) Module["expectedDataFileDownloads"] = 0;
 
 Module["expectedDataFileDownloads"]++;
@@ -196,23 +196,23 @@ Module["expectedDataFileDownloads"]++;
   });
 })();
 
-// end include: /tmp/tmp7ztlj14z.js
-// include: /tmp/tmpj34o8oy2.js
+// end include: /tmp/tmpj996o66w.js
+// include: /tmp/tmpus7iwqf7.js
 // All the pre-js content up to here must remain later on, we need to run
 // it.
 if ((typeof ENVIRONMENT_IS_WASM_WORKER != "undefined" && ENVIRONMENT_IS_WASM_WORKER) || (typeof ENVIRONMENT_IS_PTHREAD != "undefined" && ENVIRONMENT_IS_PTHREAD) || (typeof ENVIRONMENT_IS_AUDIO_WORKLET != "undefined" && ENVIRONMENT_IS_AUDIO_WORKLET)) Module["preRun"] = [];
 
 var necessaryPreJSTasks = Module["preRun"].slice();
 
-// end include: /tmp/tmpj34o8oy2.js
-// include: /tmp/tmplb4ogty9.js
+// end include: /tmp/tmpus7iwqf7.js
+// include: /tmp/tmp5f7s_gn8.js
 if (!Module["preRun"]) throw "Module.preRun should exist because file support used it; did a pre-js delete it?";
 
 necessaryPreJSTasks.forEach(task => {
   if (Module["preRun"].indexOf(task) < 0) throw "All preRun tasks that exist before user pre-js code should remain after; did you replace Module or modify Module.preRun?";
 });
 
-// end include: /tmp/tmplb4ogty9.js
+// end include: /tmp/tmp5f7s_gn8.js
 var arguments_ = [];
 
 var thisProgram = "./this.program";
@@ -8915,7 +8915,7 @@ function checkIncomingModuleAPI() {
 }
 
 var ASM_CONSTS = {
-  160488: $0 => {
+  160508: $0 => {
     var str = UTF8ToString($0) + "\n\n" + "Abort/Retry/Ignore/AlwaysIgnore? [ariA] :";
     var reply = window.prompt(str, "i");
     if (reply === null) {
@@ -8923,7 +8923,7 @@ var ASM_CONSTS = {
     }
     return reply.length === 1 ? reply.charCodeAt(0) : -1;
   },
-  160703: () => {
+  160723: () => {
     if (typeof (AudioContext) !== "undefined") {
       return true;
     } else if (typeof (webkitAudioContext) !== "undefined") {
@@ -8931,7 +8931,7 @@ var ASM_CONSTS = {
     }
     return false;
   },
-  160850: () => {
+  160870: () => {
     if ((typeof (navigator.mediaDevices) !== "undefined") && (typeof (navigator.mediaDevices.getUserMedia) !== "undefined")) {
       return true;
     } else if (typeof (navigator.webkitGetUserMedia) !== "undefined") {
@@ -8939,7 +8939,7 @@ var ASM_CONSTS = {
     }
     return false;
   },
-  161084: $0 => {
+  161104: $0 => {
     if (typeof (Module["SDL2"]) === "undefined") {
       Module["SDL2"] = {};
     }
@@ -8963,11 +8963,11 @@ var ASM_CONSTS = {
     }
     return SDL2.audioContext === undefined ? -1 : 0;
   },
-  161636: () => {
+  161656: () => {
     var SDL2 = Module["SDL2"];
     return SDL2.audioContext.sampleRate;
   },
-  161704: ($0, $1, $2, $3) => {
+  161724: ($0, $1, $2, $3) => {
     var SDL2 = Module["SDL2"];
     var have_microphone = function(stream) {
       if (SDL2.capture.silenceTimer !== undefined) {
@@ -9009,7 +9009,7 @@ var ASM_CONSTS = {
       }, have_microphone, no_microphone);
     }
   },
-  163397: ($0, $1, $2, $3) => {
+  163417: ($0, $1, $2, $3) => {
     var SDL2 = Module["SDL2"];
     SDL2.audio.scriptProcessorNode = SDL2.audioContext["createScriptProcessor"]($1, 0, $0);
     SDL2.audio.scriptProcessorNode["onaudioprocess"] = function(e) {
@@ -9041,7 +9041,7 @@ var ASM_CONSTS = {
       SDL2.audio.silenceTimer = setInterval(silence_callback, ($1 / SDL2.audioContext.sampleRate) * 1e3);
     }
   },
-  164572: ($0, $1) => {
+  164592: ($0, $1) => {
     var SDL2 = Module["SDL2"];
     var numChannels = SDL2.capture.currentCaptureBuffer.numberOfChannels;
     for (var c = 0; c < numChannels; ++c) {
@@ -9060,7 +9060,7 @@ var ASM_CONSTS = {
       }
     }
   },
-  165177: ($0, $1) => {
+  165197: ($0, $1) => {
     var SDL2 = Module["SDL2"];
     var buf = $0 >>> 2;
     var numChannels = SDL2.audio.currentOutputBuffer["numberOfChannels"];
@@ -9074,7 +9074,7 @@ var ASM_CONSTS = {
       }
     }
   },
-  165666: $0 => {
+  165686: $0 => {
     var SDL2 = Module["SDL2"];
     if ($0) {
       if (SDL2.capture.silenceTimer !== undefined) {
@@ -9108,7 +9108,7 @@ var ASM_CONSTS = {
       SDL2.audioContext = undefined;
     }
   },
-  166672: ($0, $1, $2) => {
+  166692: ($0, $1, $2) => {
     var w = $0;
     var h = $1;
     var pixels = $2;
@@ -9179,7 +9179,7 @@ var ASM_CONSTS = {
     }
     SDL2.ctx.putImageData(SDL2.image, 0, 0);
   },
-  168138: ($0, $1, $2, $3, $4) => {
+  168158: ($0, $1, $2, $3, $4) => {
     var w = $0;
     var h = $1;
     var hot_x = $2;
@@ -9216,30 +9216,32 @@ var ASM_CONSTS = {
     stringToUTF8(url, urlBuf, url.length + 1);
     return urlBuf;
   },
-  169126: $0 => {
+  169146: $0 => {
     if (Module["canvas"]) {
       Module["canvas"].style["cursor"] = UTF8ToString($0);
     }
   },
-  169209: () => {
+  169229: () => {
     if (Module["canvas"]) {
       Module["canvas"].style["cursor"] = "none";
     }
   },
-  169278: () => window.innerWidth,
-  169308: () => window.innerHeight
+  169298: () => window.innerWidth,
+  169328: () => window.innerHeight
 };
 
 // Imports from the Wasm binary.
-var _main = Module["_main"] = makeInvalidEarlyAccess("_main");
-
 var _malloc = makeInvalidEarlyAccess("_malloc");
 
 var _free = makeInvalidEarlyAccess("_free");
 
+var _fflush = makeInvalidEarlyAccess("_fflush");
+
 var _strerror = makeInvalidEarlyAccess("_strerror");
 
-var _fflush = makeInvalidEarlyAccess("_fflush");
+var _main = Module["_main"] = makeInvalidEarlyAccess("_main");
+
+var _fileno = makeInvalidEarlyAccess("_fileno");
 
 var _emscripten_stack_get_end = makeInvalidEarlyAccess("_emscripten_stack_get_end");
 
@@ -9284,11 +9286,12 @@ var wasmMemory = makeInvalidEarlyAccess("wasmMemory");
 var wasmTable = makeInvalidEarlyAccess("wasmTable");
 
 function assignWasmExports(wasmExports) {
-  assert(typeof wasmExports["main"] != "undefined", "missing Wasm export: main");
   assert(typeof wasmExports["malloc"] != "undefined", "missing Wasm export: malloc");
   assert(typeof wasmExports["free"] != "undefined", "missing Wasm export: free");
-  assert(typeof wasmExports["strerror"] != "undefined", "missing Wasm export: strerror");
   assert(typeof wasmExports["fflush"] != "undefined", "missing Wasm export: fflush");
+  assert(typeof wasmExports["strerror"] != "undefined", "missing Wasm export: strerror");
+  assert(typeof wasmExports["main"] != "undefined", "missing Wasm export: main");
+  assert(typeof wasmExports["fileno"] != "undefined", "missing Wasm export: fileno");
   assert(typeof wasmExports["emscripten_stack_get_end"] != "undefined", "missing Wasm export: emscripten_stack_get_end");
   assert(typeof wasmExports["emscripten_stack_get_base"] != "undefined", "missing Wasm export: emscripten_stack_get_base");
   assert(typeof wasmExports["sbrk"] != "undefined", "missing Wasm export: sbrk");
@@ -9308,11 +9311,12 @@ function assignWasmExports(wasmExports) {
   assert(typeof wasmExports["__set_stack_limits"] != "undefined", "missing Wasm export: __set_stack_limits");
   assert(typeof wasmExports["memory"] != "undefined", "missing Wasm export: memory");
   assert(typeof wasmExports["__indirect_function_table"] != "undefined", "missing Wasm export: __indirect_function_table");
-  _main = Module["_main"] = createExportWrapper("main", 2);
   _malloc = createExportWrapper("malloc", 1);
   _free = createExportWrapper("free", 1);
-  _strerror = createExportWrapper("strerror", 1);
   _fflush = createExportWrapper("fflush", 1);
+  _strerror = createExportWrapper("strerror", 1);
+  _main = Module["_main"] = createExportWrapper("main", 2);
+  _fileno = createExportWrapper("fileno", 1);
   _emscripten_stack_get_end = wasmExports["emscripten_stack_get_end"];
   _emscripten_stack_get_base = wasmExports["emscripten_stack_get_base"];
   _sbrk = createExportWrapper("sbrk", 1);
