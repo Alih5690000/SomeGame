@@ -13,7 +13,8 @@ class Weapon{
     SDL_Texture* head;
     Vec2f Arm_MovingOffset;
     Vec2f Head_MovingOffset;
-    //Also needs jump anim resolve
+    Vec2f ArmCenter;
+    Vec2f HeadCenter;
     std::function<void(Weapon*)> onUse;
     std::function<void(Weapon*)> onAltUse;
     std::function<void(Weapon*)> reload;
@@ -49,16 +50,17 @@ class Weapon{
         SDL_RenderCopyF(renderer,body,NULL,&owner->rect);
         float angle=std::atan2(owner->pointingTo.y-(owner->rect.y+owner->rect.h/2.f),
                 owner->pointingTo.x-(owner->rect.x+owner->rect.w/2.f))*180.f/3.14159f;
+        SDL_FPoint p={ArmCenter.x,ArmCenter.y};
         if (owner->dx==0.f){
-            SDL_RenderCopyExF(renderer,arm,NULL,&owner->rect,angle,NULL,SDL_FLIP_NONE);
+            SDL_RenderCopyExF(renderer,arm,NULL,&owner->rect,angle,&p,SDL_FLIP_NONE);
         }
         if (owner->dx<0.f){
             SDL_FRect rect={owner->rect.x-Arm_MovingOffset.x,owner->rect.y-Arm_MovingOffset.y,owner->rect.w,owner->rect.h};
-            SDL_RenderCopyExF(renderer,arm,NULL,&rect,angle,NULL,SDL_FLIP_NONE);
+            SDL_RenderCopyExF(renderer,arm,NULL,&rect,angle,&p,SDL_FLIP_NONE);
         }
         if (owner->dx>0.f){
             SDL_FRect rect={owner->rect.x+Arm_MovingOffset.x,owner->rect.y+Arm_MovingOffset.y,owner->rect.w,owner->rect.h};
-            SDL_RenderCopyExF(renderer,arm,NULL,&rect,angle,NULL,SDL_FLIP_NONE);
+            SDL_RenderCopyExF(renderer,arm,NULL,&rect,angle,&p,SDL_FLIP_NONE);
         }
     }
     void Use(){
