@@ -15,9 +15,13 @@
   var TARGET_NOT_SUPPORTED = 2147483647;
   // Note: We use a typeof check here instead of optional chaining using
   // globalThis because older browsers might not have globalThis defined.
-  var currentNodeVersion = typeof process !== "undefined" && process.versions?.node ? humanReadableVersionToPacked(process.versions.node) : TARGET_NOT_SUPPORTED;
-  if (currentNodeVersion < 180300) {
-    throw new Error(`This emscripten-generated code requires node v${packedVersionToHumanReadable(180300)} (detected v${packedVersionToHumanReadable(currentNodeVersion)})`);
+  // We skip the node version checking when running on Bun/Deno since the node
+  // version they report doesn't seem to be useful.
+  if (typeof process !== "undefined" && !process.versions?.bun && typeof Deno == "undefined") {
+    var currentNodeVersion = process.versions?.node ? humanReadableVersionToPacked(process.versions.node) : TARGET_NOT_SUPPORTED;
+    if (currentNodeVersion < 180300) {
+      throw new Error(`This emscripten-generated code requires node v${packedVersionToHumanReadable(180300)} (detected v${packedVersionToHumanReadable(currentNodeVersion)})`);
+    }
   }
   var userAgent = typeof navigator !== "undefined" && navigator.userAgent;
   if (!userAgent) {
@@ -68,7 +72,7 @@ var ENVIRONMENT_IS_SHELL = !ENVIRONMENT_IS_WEB && !ENVIRONMENT_IS_NODE && !ENVIR
 
 // --pre-jses are emitted after the Module integration code, so that they can
 // refer to Module (if they choose; they can also define Module)
-// include: /tmp/tmpj996o66w.js
+// include: /tmp/tmpz337y7ek.js
 if (!Module["expectedDataFileDownloads"]) Module["expectedDataFileDownloads"] = 0;
 
 Module["expectedDataFileDownloads"]++;
@@ -150,10 +154,6 @@ Module["expectedDataFileDownloads"]++;
         if (!check) throw new Error(msg);
       }
       Module["FS_createPath"]("/", "assets", true, true);
-      for (var file of metadata["files"]) {
-        var name = file["filename"];
-        Module["addRunDependency"](`fp ${name}`);
-      }
       async function processPackageData(arrayBuffer) {
         assert(arrayBuffer, "Loading data file failed.");
         assert(arrayBuffer.constructor.name === ArrayBuffer.name, "bad input to processPackageData " + arrayBuffer.constructor.name);
@@ -165,7 +165,6 @@ Module["expectedDataFileDownloads"]++;
           var data = byteArray.subarray(file["start"], file["end"]);
           // canOwn this data in the filesystem, it is a slice into the heap that will never change
           Module["FS_createDataFile"](name, null, data, true, true, true);
-          Module["removeRunDependency"](`fp ${name}`);
         }
         Module["removeRunDependency"]("datafile_main.data");
       }
@@ -177,9 +176,10 @@ Module["expectedDataFileDownloads"]++;
       if (!fetched) {
         fetched = await fetchPromise;
       }
-      processPackageData(fetched);
+      await processPackageData(fetched);
     }
-    if (Module["calledRun"]) {
+    // Detect whether the module JS file has already been loaded.
+    if (Module["FS_createPath"]) {
       runWithFS(Module);
     } else {
       if (!Module["preRun"]) Module["preRun"] = [];
@@ -196,24 +196,24 @@ Module["expectedDataFileDownloads"]++;
   });
 })();
 
-// end include: /tmp/tmpj996o66w.js
-// include: /tmp/tmpus7iwqf7.js
+// end include: /tmp/tmpz337y7ek.js
+// include: /tmp/tmpmymo7iur.js
 // All the pre-js content up to here must remain later on, we need to run
 // it.
 if ((typeof ENVIRONMENT_IS_WASM_WORKER != "undefined" && ENVIRONMENT_IS_WASM_WORKER) || (typeof ENVIRONMENT_IS_PTHREAD != "undefined" && ENVIRONMENT_IS_PTHREAD) || (typeof ENVIRONMENT_IS_AUDIO_WORKLET != "undefined" && ENVIRONMENT_IS_AUDIO_WORKLET)) Module["preRun"] = [];
 
 var necessaryPreJSTasks = Module["preRun"].slice();
 
-// end include: /tmp/tmpus7iwqf7.js
-// include: /tmp/tmp5f7s_gn8.js
+// end include: /tmp/tmpmymo7iur.js
+// include: /tmp/tmppb3pbr73.js
 if (!Module["preRun"]) throw "Module.preRun should exist because file support used it; did a pre-js delete it?";
 
 necessaryPreJSTasks.forEach(task => {
   if (Module["preRun"].indexOf(task) < 0) throw "All preRun tasks that exist before user pre-js code should remain after; did you replace Module or modify Module.preRun?";
 });
 
-// end include: /tmp/tmp5f7s_gn8.js
-var arguments_ = [];
+// end include: /tmp/tmppb3pbr73.js
+var programArgs = [];
 
 var thisProgram = "./this.program";
 
@@ -271,7 +271,7 @@ if (ENVIRONMENT_IS_NODE) {
   if (process.argv.length > 1) {
     thisProgram = process.argv[1].replace(/\\/g, "/");
   }
-  arguments_ = process.argv.slice(2);
+  programArgs = process.argv.slice(2);
   // MODULARIZE will export the module in the proper place outside, we don't need to export here
   if (typeof module != "undefined") {
     module["exports"] = Module;
@@ -405,41 +405,6 @@ var EXITSTATUS;
  */ var isFileURI = filename => filename.startsWith("file://");
 
 // include: runtime_common.js
-// include: runtime_stack_check.js
-// Initializes the stack cookie. Called at the startup of main and at the startup of each thread in pthreads mode.
-function writeStackCookie() {
-  var max = _emscripten_stack_get_end();
-  assert((max & 3) == 0);
-  // If the stack ends at address zero we write our cookies 4 bytes into the
-  // stack.  This prevents interference with SAFE_HEAP and ASAN which also
-  // monitor writes to address zero.
-  if (max == 0) {
-    max += 4;
-  }
-  // The stack grow downwards towards _emscripten_stack_get_end.
-  // We write cookies to the final two words in the stack and detect if they are
-  // ever overwritten.
-  HEAPU32[SAFE_HEAP_INDEX(HEAPU32, ((max) >> 2), "storing")] = 34821223;
-  checkInt32(34821223);
-  HEAPU32[SAFE_HEAP_INDEX(HEAPU32, (((max) + (4)) >> 2), "storing")] = 2310721022;
-  checkInt32(2310721022);
-}
-
-function checkStackCookie() {
-  if (ABORT) return;
-  var max = _emscripten_stack_get_end();
-  // See writeStackCookie().
-  if (max == 0) {
-    max += 4;
-  }
-  var cookie1 = HEAPU32[SAFE_HEAP_INDEX(HEAPU32, ((max) >> 2), "loading")];
-  var cookie2 = HEAPU32[SAFE_HEAP_INDEX(HEAPU32, (((max) + (4)) >> 2), "loading")];
-  if (cookie1 != 34821223 || cookie2 != 2310721022) {
-    abort(`Stack overflow! Stack cookie has been overwritten at ${ptrToString(max)}, expected hex dwords 0x89BACDFE and 0x2135467, but received ${ptrToString(cookie2)} ${ptrToString(cookie1)}`);
-  }
-}
-
-// end include: runtime_stack_check.js
 // include: runtime_exceptions.js
 // Base Emscripten EH error class
 class EmscriptenEH extends Error {}
@@ -478,14 +443,33 @@ function dbg(...args) {
 })();
 
 function consumedModuleProp(prop) {
-  if (!Object.getOwnPropertyDescriptor(Module, prop)) {
-    Object.defineProperty(Module, prop, {
-      configurable: true,
-      set() {
-        abort(`Attempt to set \`Module.${prop}\` after it has already been processed.  This can happen, for example, when code is injected via '--post-js' rather than '--pre-js'`);
+  var value = Module[prop];
+  var msg = `Attempt to modify \`Module.${prop}\` after it has already been processed.  This can happen, for example, when code is injected via '--post-js' rather than '--pre-js'`;
+  if (Array.isArray(value)) {
+    value = new Proxy(value, {
+      set(target, key, val) {
+        abort(msg);
+        return false;
+      },
+      defineProperty(target, key, descriptor) {
+        abort(msg);
+        return false;
+      },
+      deleteProperty(target, key) {
+        abort(msg);
+        return false;
       }
     });
   }
+  Object.defineProperty(Module, prop, {
+    configurable: true,
+    get() {
+      return value;
+    },
+    set() {
+      abort(msg);
+    }
+  });
 }
 
 function makeInvalidEarlyAccess(name) {
@@ -610,6 +594,49 @@ var checkInt53 = value => checkInt(value, 53, MIN_INT53, MAX_UINT53);
 var checkInt64 = value => checkInt(value, 64, MIN_INT64, MAX_UINT64);
 
 // end include: runtime_debug.js
+// include: runtime_stack_check.js
+const stackCookie1 = 34821223;
+
+const stackCookie2 = 2310721022;
+
+// Initializes the stack cookie. Called at the startup of main and at the startup of each thread in pthreads mode.
+function writeStackCookie() {
+  var max = _emscripten_stack_get_end();
+  assert((max & 3) == 0);
+  // If the stack ends at address zero we write our cookies 4 bytes into the
+  // stack.  This prevents interference with SAFE_HEAP and ASAN which also
+  // monitor writes to address zero.
+  if (max == 0) {
+    max += 4;
+  }
+  // The stack grow downwards towards _emscripten_stack_get_end.
+  // We write cookies to the final two words in the stack and detect if they are
+  // ever overwritten.
+  HEAPU32[SAFE_HEAP_INDEX(HEAPU32, ((max) >> 2), "storing")] = stackCookie1;
+  checkInt32(stackCookie1);
+  HEAPU32[SAFE_HEAP_INDEX(HEAPU32, (((max) + (4)) >> 2), "storing")] = stackCookie2;
+  checkInt32(stackCookie2);
+}
+
+function u32ToHexString(num) {
+  return "0x" + (num >>> 0).toString(16).padStart(8, "0");
+}
+
+function checkStackCookie() {
+  if (ABORT) return;
+  var max = _emscripten_stack_get_end();
+  // See writeStackCookie().
+  if (max == 0) {
+    max += 4;
+  }
+  var val1 = HEAPU32[SAFE_HEAP_INDEX(HEAPU32, ((max) >> 2), "loading")];
+  var val2 = HEAPU32[SAFE_HEAP_INDEX(HEAPU32, (((max) + (4)) >> 2), "loading")];
+  if (val1 != stackCookie1 || val2 != stackCookie2) {
+    abort(`Stack overflow! Stack cookie has been overwritten at ${ptrToString(max)}, expected hex dwords ${u32ToHexString(stackCookie2)} and ${u32ToHexString(stackCookie1)}, but received ${u32ToHexString(val2)} ${u32ToHexString(val1)}`);
+  }
+}
+
+// end include: runtime_stack_check.js
 // include: runtime_safe_heap.js
 function SAFE_HEAP_INDEX(arr, idx, action) {
   const bytes = arr.BYTES_PER_ELEMENT;
@@ -637,8 +664,17 @@ function alignfault() {
 // Memory management
 var runtimeInitialized = false;
 
+// When ALLOW_MEMORY_GROWTH is enabled, the conversion from Wasm
+// memory to ArrayBuffer requires some additional logic.
+function getMemoryBuffer() {
+  return wasmMemory.buffer;
+}
+
 function updateMemoryViews() {
-  var b = wasmMemory.buffer;
+  // If we already have a heap that is resizeable/growable buffer we don't
+  // need to do anything in updateMemoryViews.
+  if (HEAP8?.buffer?.resizable) return;
+  var b = getMemoryBuffer();
   HEAP8 = new Int8Array(b);
   HEAP16 = new Int16Array(b);
   HEAPU8 = new Uint8Array(b);
@@ -657,11 +693,10 @@ function updateMemoryViews() {
 assert(globalThis.Int32Array && globalThis.Float64Array && Int32Array.prototype.subarray && Int32Array.prototype.set, "JS engine does not provide full typed array support");
 
 function preRun() {
-  if (Module["preRun"]) {
-    if (typeof Module["preRun"] == "function") Module["preRun"] = [ Module["preRun"] ];
-    while (Module["preRun"].length) {
-      addOnPreRun(Module["preRun"].shift());
-    }
+  var preRun = Module["preRun"];
+  if (preRun) {
+    if (typeof preRun == "function") preRun = [ preRun ];
+    onPreRuns.push(...preRun);
   }
   consumedModuleProp("preRun");
   // Begin ATPRERUNS hooks
@@ -680,20 +715,16 @@ function initRuntime() {
   wasmExports["__wasm_call_ctors"]();
   // Begin ATPOSTCTORS hooks
   FS.ignorePermissions = false;
-}
-
-function preMain() {
+  // End ATPOSTCTORS hooks
   checkStackCookie();
 }
 
 function postRun() {
   checkStackCookie();
-  // PThreads reuse the runtime from the main thread.
-  if (Module["postRun"]) {
-    if (typeof Module["postRun"] == "function") Module["postRun"] = [ Module["postRun"] ];
-    while (Module["postRun"].length) {
-      addOnPostRun(Module["postRun"].shift());
-    }
+  var postRun = Module["postRun"];
+  if (postRun) {
+    if (typeof postRun == "function") postRun = [ postRun ];
+    onPostRuns.push(...postRun);
   }
   consumedModuleProp("postRun");
   // Begin ATPOSTRUNS hooks
@@ -728,14 +759,13 @@ function postRun() {
   throw e;
 }
 
-function createExportWrapper(name, nargs) {
+function createExportWrapper(name, func, nargs) {
+  assert(func);
   return (...args) => {
     assert(runtimeInitialized, `native function \`${name}\` called before runtime initialization`);
-    var f = wasmExports[name];
-    assert(f, `exported native function \`${name}\` not found`);
     // Only assert for too many arguments. Too few can be valid since the missing arguments will be zero filled.
     assert(args.length <= nargs, `native function \`${name}\` called with ${args.length} args but expects ${nargs}`);
-    return f(...args);
+    return func(...args);
   };
 }
 
@@ -746,9 +776,6 @@ function findWasmBinary() {
 }
 
 function getBinarySync(file) {
-  if (file == wasmBinaryFile && wasmBinary) {
-    return new Uint8Array(wasmBinary);
-  }
   if (readBinary) {
     return readBinary(file);
   }
@@ -818,14 +845,12 @@ async function createWasm() {
   // Load the wasm module and create an instance of using native support in the JS engine.
   // handle a generated wasm instance, receiving its exports and
   // performing other necessary setup
-  /** @param {WebAssembly.Module=} module*/ function receiveInstance(instance, module) {
+  function receiveInstance(instance) {
     wasmExports = instance.exports;
     assignWasmExports(wasmExports);
     updateMemoryViews();
-    removeRunDependency("wasm-instantiate");
     return wasmExports;
   }
-  addRunDependency("wasm-instantiate");
   // Prefer streaming instantiation if available.
   // Async compilation can be confusing when an error on the page overwrites Module
   // (for example, if the order of elements is wrong, and the one defining Module is
@@ -847,15 +872,14 @@ async function createWasm() {
   // performing.
   // Also pthreads and wasm workers initialize the wasm instance through this
   // path.
-  if (Module["instantiateWasm"]) {
-    return new Promise((resolve, reject) => {
+  var instantiateWasm = Module["instantiateWasm"];
+  if (instantiateWasm) {
+    return new Promise(resolve => {
       try {
-        Module["instantiateWasm"](info, (inst, mod) => {
-          resolve(receiveInstance(inst, mod));
-        });
+        instantiateWasm(info, inst => resolve(receiveInstance(inst)));
       } catch (e) {
         err(`Module.instantiateWasm callback failed with error: ${e}`);
-        reject(e);
+        throw e;
       }
     });
   }
@@ -909,65 +933,6 @@ var addOnPostRun = cb => onPostRuns.push(cb);
 var onPreRuns = [];
 
 var addOnPreRun = cb => onPreRuns.push(cb);
-
-var runDependencies = 0;
-
-var dependenciesFulfilled = null;
-
-var runDependencyTracking = {};
-
-var runDependencyWatcher = null;
-
-var removeRunDependency = id => {
-  runDependencies--;
-  Module["monitorRunDependencies"]?.(runDependencies);
-  assert(id, "removeRunDependency requires an ID");
-  assert(runDependencyTracking[id]);
-  delete runDependencyTracking[id];
-  if (runDependencies == 0) {
-    if (runDependencyWatcher !== null) {
-      clearInterval(runDependencyWatcher);
-      runDependencyWatcher = null;
-    }
-    if (dependenciesFulfilled) {
-      var callback = dependenciesFulfilled;
-      dependenciesFulfilled = null;
-      callback();
-    }
-  }
-};
-
-var addRunDependency = id => {
-  runDependencies++;
-  Module["monitorRunDependencies"]?.(runDependencies);
-  assert(id, "addRunDependency requires an ID");
-  assert(!runDependencyTracking[id]);
-  runDependencyTracking[id] = 1;
-  if (runDependencyWatcher === null && globalThis.setInterval) {
-    // Check for missing dependencies every few seconds
-    runDependencyWatcher = setInterval(() => {
-      if (ABORT) {
-        clearInterval(runDependencyWatcher);
-        runDependencyWatcher = null;
-        return;
-      }
-      var shown = false;
-      for (var dep in runDependencyTracking) {
-        if (!shown) {
-          shown = true;
-          err("still waiting on run dependencies:");
-        }
-        err(`dependency: ${dep}`);
-      }
-      if (shown) {
-        err("(end of list)");
-      }
-    }, 1e4);
-    // Prevent this timer from keeping the runtime alive if nothing
-    // else is.
-    runDependencyWatcher.unref?.();
-  }
-};
 
 /**
    * @param {number} ptr
@@ -1083,7 +1048,13 @@ var warnOnce = text => {
 
 var UTF8Decoder = globalThis.TextDecoder && new TextDecoder;
 
-var findStringEnd = (heapOrArray, idx, maxBytesToRead, ignoreNul) => {
+/**
+   * heapOrArray is either a regular array, or a JavaScript typed array view.
+   * @param {number} idx
+   * @param {number=} maxBytesToRead
+   * @param {boolean=} ignoreNul
+   * @return {number}
+   */ var findStringEnd = (heapOrArray, idx, maxBytesToRead, ignoreNul) => {
   var maxIdx = idx + maxBytesToRead;
   if (ignoreNul) return maxIdx;
   // TextDecoder needs to know the byte length in advance, it doesn't stop on
@@ -1259,7 +1230,7 @@ var findMatchingCatch = args => {
   // type of the thrown object. Find one which matches, and
   // return the type of the catch block which should be called.
   for (var caughtType of args) {
-    if (caughtType === 0 || caughtType === thrownType) {
+    if (!caughtType || caughtType === thrownType) {
       // Catch all clause matched or exactly the same type is caught
       break;
     }
@@ -1277,6 +1248,10 @@ var ___cxa_find_matching_catch_2 = () => findMatchingCatch([]);
 
 var ___cxa_find_matching_catch_3 = arg0 => findMatchingCatch([ arg0 ]);
 
+var __Unwind_RaiseException = ex => {
+  throw ex;
+};
+
 var ___cxa_rethrow = () => {
   if (!exceptionCaught.length) {
     abort("no exception to throw");
@@ -1287,8 +1262,8 @@ var ___cxa_rethrow = () => {
   info.set_caught(false);
   uncaughtExceptionCount++;
   ___cxa_increment_exception_refcount(ptr);
-  exceptionLast = new CppException(ptr);
-  throw exceptionLast;
+  ptr = exceptionLast = new CppException(ptr);
+  __Unwind_RaiseException(ptr);
 };
 
 var stackAlloc = sz => __emscripten_stack_alloc(sz);
@@ -1322,9 +1297,9 @@ var ___cxa_throw = (ptr, type, destructor) => {
   // Initialize ExceptionInfo content after it was allocated in __cxa_allocate_exception.
   info.init(type, destructor);
   ___cxa_increment_exception_refcount(ptr);
-  exceptionLast = new CppException(ptr);
+  ptr = exceptionLast = new CppException(ptr);
   uncaughtExceptionCount++;
-  throw exceptionLast;
+  __Unwind_RaiseException(ptr);
 };
 
 var ___cxa_uncaught_exceptions = () => uncaughtExceptionCount;
@@ -1335,11 +1310,13 @@ var ___handle_stack_overflow = requested => {
   abort(`stack overflow (Attempt to set SP to ${ptrToString(requested)}` + `, with stack limits [${ptrToString(end)} - ${ptrToString(base)}` + "]). If you require more stack space build with -sSTACK_SIZE=<bytes>");
 };
 
+var __Unwind_Resume = ex => {
+  throw ex;
+};
+
 var ___resumeException = ptr => {
-  if (!exceptionLast) {
-    exceptionLast = new CppException(ptr);
-  }
-  throw exceptionLast;
+  ptr = exceptionLast ??= new CppException(ptr);
+  __Unwind_Resume(ptr);
 };
 
 var syscallGetVarargI = () => {
@@ -1414,7 +1391,7 @@ var initRandomFill = () => {
   // This block is not needed on v19+ since crypto.getRandomValues is builtin
   if (ENVIRONMENT_IS_NODE) {
     var nodeCrypto = require("node:crypto");
-    return view => nodeCrypto.randomFillSync(view);
+    return view => (nodeCrypto.randomFillSync(view), 0);
   }
   return view => (crypto.getRandomValues(view), 0);
 };
@@ -1631,12 +1608,15 @@ var TTY = {
         } catch (e) {
           throw new FS.ErrnoError(29);
         }
-        if (result === undefined && bytesRead === 0) {
+        if (result === undefined && !bytesRead) {
           throw new FS.ErrnoError(6);
         }
         if (result === null || result === undefined) break;
         bytesRead++;
         buffer[offset + i] = result;
+        // We currently only support canonical mode (ICANON), where
+        // read(2) returns as soon as a line delimiter is read.
+        if (result === 10) break;
       }
       if (bytesRead) {
         stream.node.atime = Date.now();
@@ -1950,10 +1930,10 @@ var MEMFS = {
       var node = stream.node;
       node.mtime = node.ctime = Date.now();
       if (canOwn) {
-        assert(position === 0, "canOwn must imply no weird position inside the file");
+        assert(!position, "canOwn must imply no weird position inside the file");
         node.contents = buffer.subarray(offset, offset + length);
         node.usedBytes = length;
-      } else if (node.usedBytes === 0 && position === 0) {
+      } else if (!node.usedBytes && !position) {
         // If this is a simple first write to an empty file, do a fast set since we don't need to care about old data.
         node.contents = buffer.slice(offset, offset + length);
         node.usedBytes = length;
@@ -2199,6 +2179,68 @@ var getUniqueRunDependency = id => {
   }
 };
 
+var dependenciesPromise = null;
+
+var resolveRunDependencies = async () => dependenciesPromise;
+
+var runDependencies = 0;
+
+var dependenciesPromiseResolve = null;
+
+var runDependencyTracking = {};
+
+var runDependencyWatcher = null;
+
+var removeRunDependency = id => {
+  runDependencies--;
+  Module["monitorRunDependencies"]?.(runDependencies);
+  assert(id, "removeRunDependency requires an ID");
+  assert(runDependencyTracking[id]);
+  delete runDependencyTracking[id];
+  if (!runDependencies) {
+    if (runDependencyWatcher !== null) {
+      clearInterval(runDependencyWatcher);
+      runDependencyWatcher = null;
+    }
+    dependenciesPromiseResolve();
+  }
+};
+
+var addRunDependency = id => {
+  if (!runDependencies) {
+    dependenciesPromise = new Promise(resolve => dependenciesPromiseResolve = resolve);
+  }
+  runDependencies++;
+  Module["monitorRunDependencies"]?.(runDependencies);
+  assert(id, "addRunDependency requires an ID");
+  assert(!runDependencyTracking[id]);
+  runDependencyTracking[id] = 1;
+  if (!runDependencyWatcher && globalThis.setInterval) {
+    // Check for missing dependencies every few seconds
+    runDependencyWatcher = setInterval(() => {
+      if (ABORT) {
+        clearInterval(runDependencyWatcher);
+        runDependencyWatcher = null;
+        return;
+      }
+      var shown = false;
+      for (var dep in runDependencyTracking) {
+        if (!shown) {
+          shown = true;
+          err("still waiting on run dependencies:");
+        }
+        err(`dependency: ${dep}`);
+      }
+      if (shown) {
+        err("(end of list)");
+      }
+    }, 1e4);
+    // Prevent this timer from keeping the runtime alive if nothing
+    // else is.
+    runDependencyWatcher.unref?.();
+  }
+};
+
 var preloadPlugins = [];
 
 var FS_handledByPreloadPlugin = async (byteArray, fullname) => {
@@ -2337,6 +2379,53 @@ var FS = {
     }
     get isDevice() {
       return FS.isChrdev(this.mode);
+    }
+    // The per-inode readiness wait-queue. The node carries a Set of listener
+    // entries {cb}; producers (SOCKFS, PIPEFS) call notifyListeners on a
+    // readiness transition, and poll()/epoll consume it. It lives on the node
+    // (not the fd) so dup'd fds share one queue. Only nodes that derive real
+    // readiness (sockets, pipes, and an epoll's own node) ever use this -
+    // always-ready types (regular files, ttys) never register or notify.
+    addListener(cb, exclusive = false) {
+      var entry = {
+        cb,
+        exclusive
+      };
+      var listeners = (this.listeners ??= new Set);
+      listeners.add(entry);
+      return {
+        listeners,
+        entry
+      };
+    }
+    notifyListeners(flags) {
+      // Iterates the set without copying, which is safe ONLY under a
+      // load-bearing contract that every internal listener must honour:
+      //   1. A listener must not run user code synchronously (a poll waiter only
+      //      resolves a Promise; an epoll registration only re-lists +
+      //      re-notifies; the epoll callback only schedules a tick). User code
+      //      runs on a later tick, never inside this loop.
+      //   2. A listener may delete entries only from ITS OWN waiter, never from
+      //      a sibling node's set that may be mid-iteration. (Deleting an entry
+      //      of the set being iterated here is fine - a Set tolerates removal of
+      //      a not-yet-visited entry mid-iteration; mutating a *different* node's
+      //      set is fine because that set is not being iterated.)
+      // Violating either gives silently skipped wakeups that are near-impossible
+      // to reproduce. Any new producer/listener must preserve it.
+      if (!this.listeners) return;
+      // Fire every non-exclusive listener. Among EPOLLEXCLUSIVE registrations
+      // (one fd watched by several epolls) wake only one, rotating round-robin
+      // per node, to avoid a thundering herd. (Only epoll registrations are ever
+      // exclusive; poll waiters and a node's own consumers are not.)
+      var excl;
+      for (var entry of this.listeners) {
+        if (entry.exclusive) (excl ||= []).push(entry); else entry.cb(flags);
+      }
+      if (excl) {
+        var i = (this.exclTurn || 0) % excl.length;
+        this.exclTurn = i + 1;
+        excl[i].cb(flags);
+      }
     }
   },
   lookupPath(path, opts = {}) {
@@ -2892,6 +2981,27 @@ var FS = {
     }
     return parent.node_ops.symlink(parent, newname, oldpath);
   },
+  link(oldpath, newpath, flags) {
+    var lookup = FS.lookupPath(newpath, {
+      parent: true
+    });
+    var parent = lookup.node;
+    if (!parent) {
+      throw new FS.ErrnoError(44);
+    }
+    var newname = PATH.basename(newpath);
+    var errCode = FS.mayCreate(parent, newname);
+    if (errCode) {
+      throw new FS.ErrnoError(errCode);
+    }
+    // Hardlinks are only supported by filesystem backends that provide a
+    // `link` node op (e.g. NODERAWFS backed by the host). NODEFS omits it:
+    // a host hardlink cannot be confined to the mount root.
+    if (!parent.node_ops.link) {
+      throw new FS.ErrnoError(34);
+    }
+    return parent.node_ops.link(parent, newname, oldpath, flags);
+  },
   rename(old_path, new_path) {
     var old_dirname = PATH.dirname(old_path);
     var new_dirname = PATH.dirname(new_path);
@@ -3149,15 +3259,14 @@ var FS = {
     }
     FS.doTruncate(stream, stream.node, len);
   },
-  utime(path, atime, mtime) {
+  utime(path, atime, mtime, dontFollow) {
     var lookup = FS.lookupPath(path, {
-      follow: true
+      follow: !dontFollow
     });
-    var node = lookup.node;
-    var setattr = FS.checkOpExists(node.node_ops.setattr, 63);
-    setattr(node, {
+    FS.doSetAttr(null, lookup.node, {
       atime,
-      mtime
+      mtime,
+      dontFollow
     });
   },
   open(path, flags, mode = 438) {
@@ -3259,6 +3368,11 @@ var FS = {
     }
     if (stream.getdents) stream.getdents = null;
     // free readdir state
+    // The fd is going away: wake anything waiting on it (poll/epoll) with
+    // POLLNVAL so a blocking wait unblocks and an epoll registration is evicted
+    // on its next derive. Only sockets/pipes/epoll ever carry a wait-queue, so
+    // for every other stream (incl. nodeless noderawfs stdio) this is a no-op.
+    stream.node?.notifyListeners(32);
     try {
       if (stream.stream_ops.close) {
         stream.stream_ops.close(stream);
@@ -3353,7 +3467,7 @@ var FS = {
     // to write to file opened in read-only mode with MAP_PRIVATE flag,
     // as all modifications will be visible only in the memory of
     // the current process.
-    if ((prot & 2) !== 0 && (flags & 2) === 0 && (stream.flags & 2097155) !== 2) {
+    if ((prot & 2) && !(flags & 2) && (stream.flags & 2097155) !== 2) {
       throw new FS.ErrnoError(2);
     }
     if ((stream.flags & 2097155) === 1) {
@@ -3381,8 +3495,8 @@ var FS = {
     return stream.stream_ops.ioctl(stream, cmd, arg);
   },
   readFile(path, opts = {}) {
-    opts.flags = opts.flags || 0;
-    opts.encoding = opts.encoding || "binary";
+    opts.flags = opts.flags ?? 0;
+    opts.encoding = opts.encoding ?? "binary";
     if (opts.encoding !== "utf8" && opts.encoding !== "binary") {
       abort(`Invalid encoding type "${opts.encoding}"`);
     }
@@ -3398,7 +3512,7 @@ var FS = {
     return buf;
   },
   writeFile(path, data, opts = {}) {
-    opts.flags = opts.flags || 577;
+    opts.flags = opts.flags ?? 577;
     var stream = FS.open(path, opts.flags, opts.mode);
     data = FS_fileDataToTypedArray(data);
     FS.write(stream, data, 0, data.byteLength, undefined, opts.canOwn);
@@ -3447,7 +3561,7 @@ var FS = {
     // use a buffer to avoid overhead of individual crypto calls per byte
     var randomBuffer = new Uint8Array(1024), randomLeft = 0;
     var randomByte = () => {
-      if (randomLeft === 0) {
+      if (!randomLeft) {
         randomFill(randomBuffer);
         randomLeft = randomBuffer.byteLength;
       }
@@ -3671,7 +3785,7 @@ var FS = {
           } catch (e) {
             throw new FS.ErrnoError(29);
           }
-          if (result === undefined && bytesRead === 0) {
+          if (result === undefined && !bytesRead) {
             throw new FS.ErrnoError(6);
           }
           if (result === null || result === undefined) break;
@@ -3735,7 +3849,7 @@ var FS = {
         var xhr = new XMLHttpRequest;
         xhr.open("HEAD", url, false);
         xhr.send(null);
-        if (!(xhr.status >= 200 && xhr.status < 300 || xhr.status === 304)) abort("Couldn't load " + url + ". Status: " + xhr.status);
+        if (!(xhr.status >= 200 && xhr.status < 300 || xhr.status === 304)) abort(`Couldn't load ${url}. Status: ${xhr.status}`);
         var datalength = Number(xhr.getResponseHeader("Content-length"));
         var header;
         var hasByteServing = (header = xhr.getResponseHeader("Accept-Ranges")) && header === "bytes";
@@ -3745,23 +3859,23 @@ var FS = {
         if (!hasByteServing) chunkSize = datalength;
         // Function to get a range from the remote URL.
         var doXHR = (from, to) => {
-          if (from > to) abort("invalid range (" + from + ", " + to + ") or no bytes requested!");
-          if (to > datalength - 1) abort("only " + datalength + " bytes available! programmer error!");
+          if (from > to) abort(`invalid range (${from}, ${to}) or no bytes requested!`);
+          if (to > datalength - 1) abort(`only ${datalength} bytes available! programmer error!`);
           // TODO: Use mozResponseArrayBuffer, responseStream, etc. if available.
           var xhr = new XMLHttpRequest;
           xhr.open("GET", url, false);
-          if (datalength !== chunkSize) xhr.setRequestHeader("Range", "bytes=" + from + "-" + to);
+          if (datalength !== chunkSize) xhr.setRequestHeader("Range", `bytes=${from}-${to}`);
           // Some hints to the browser that we want binary data.
           xhr.responseType = "arraybuffer";
           if (xhr.overrideMimeType) {
             xhr.overrideMimeType("text/plain; charset=x-user-defined");
           }
           xhr.send(null);
-          if (!(xhr.status >= 200 && xhr.status < 300 || xhr.status === 304)) abort("Couldn't load " + url + ". Status: " + xhr.status);
+          if (!(xhr.status >= 200 && xhr.status < 300 || xhr.status === 304)) abort(`Couldn't load ${url}. Status: ${xhr.status}`);
           if (xhr.response !== undefined) {
             return new Uint8Array(/** @type{Array<number>} */ (xhr.response || []));
           }
-          return intArrayFromString(xhr.responseText || "", true);
+          return intArrayFromString(xhr.responseText ?? "", true);
         };
         var lazyArray = this;
         lazyArray.setDataGetter(chunkNum => {
@@ -3972,7 +4086,7 @@ var SYSCALLS = {
       // MAP_PRIVATE calls need not to be synced back to underlying fs
       return 0;
     }
-    var buffer = HEAPU8.slice(addr, addr + len);
+    var buffer = HEAPU8.subarray(addr, addr + len);
     FS.msync(stream, buffer, offset, len, flags);
   },
   getStreamFromFD(fd) {
@@ -4482,7 +4596,7 @@ var callUserCallback = func => {
 };
 
 function getFullscreenElement() {
-  return document.fullscreenElement || document.mozFullScreenElement || document.webkitFullscreenElement || document.webkitCurrentFullScreenElement || document.msFullscreenElement;
+  return document.fullscreenElement ?? document.webkitFullscreenElement;
 }
 
 /** @param {number=} timeout */ var safeSetTimeout = (func, timeout) => setTimeout(() => {
@@ -4494,7 +4608,6 @@ var Browser = {
   isFullscreen: false,
   pointerLock: false,
   moduleContextCreatedCallbacks: [],
-  workers: [],
   preloadedImages: {},
   preloadedAudios: {},
   getCanvas: () => Module["canvas"],
@@ -4562,7 +4675,7 @@ var Browser = {
       var url = URL.createObjectURL(b);
       // XXX we never revoke this!
       var audio = new Audio;
-      audio.addEventListener("canplaythrough", () => finish(audio), false);
+      audio.addEventListener("canplaythrough", () => finish(audio));
       // use addEventListener due to chromium bug 124926
       audio.onerror = event => {
         if (done) return;
@@ -4573,8 +4686,8 @@ var Browser = {
           var ret = "";
           var leftchar = 0;
           var leftbits = 0;
-          for (var i = 0; i < data.length; i++) {
-            leftchar = (leftchar << 8) | data[i];
+          for (var byte of data) {
+            leftchar = (leftchar << 8) | byte;
             leftbits += 8;
             while (leftbits >= 6) {
               var curr = (leftchar >> (leftbits - 6)) & 63;
@@ -4610,14 +4723,14 @@ var Browser = {
     if (canvas) {
       // forced aspect ratio can be enabled by defining 'forcedAspectRatio' on Module
       // Module['forcedAspectRatio'] = 4 / 3;
-      document.addEventListener("pointerlockchange", pointerLockChange, false);
+      document.addEventListener("pointerlockchange", pointerLockChange);
       if (Module["elementPointerLock"]) {
         canvas.addEventListener("click", ev => {
           if (!Browser.pointerLock && Browser.getCanvas().requestPointerLock) {
             Browser.getCanvas().requestPointerLock();
             ev.preventDefault();
           }
-        }, false);
+        });
       }
     }
   },
@@ -4692,35 +4805,30 @@ var Browser = {
           Browser.updateCanvasDimensions(canvas);
         }
       }
-      Module["onFullScreen"]?.(Browser.isFullscreen);
-      Module["onFullscreen"]?.(Browser.isFullscreen);
     }
     if (!Browser.fullscreenHandlersInstalled) {
       Browser.fullscreenHandlersInstalled = true;
-      document.addEventListener("fullscreenchange", fullscreenChange, false);
-      document.addEventListener("mozfullscreenchange", fullscreenChange, false);
-      document.addEventListener("webkitfullscreenchange", fullscreenChange, false);
-      document.addEventListener("MSFullscreenChange", fullscreenChange, false);
+      document.addEventListener("fullscreenchange", fullscreenChange);
+      document.addEventListener("webkitfullscreenchange", fullscreenChange);
     }
     // create a new parent to ensure the canvas has no siblings. this allows browsers to optimize full screen performance when its parent is the full screen root
     var canvasContainer = document.createElement("div");
     canvas.parentNode.insertBefore(canvasContainer, canvas);
     canvasContainer.appendChild(canvas);
     // use parent of canvas as full screen root to allow aspect ratio correction (Firefox stretches the root to screen size)
-    canvasContainer.requestFullscreen = canvasContainer["requestFullscreen"] || canvasContainer["mozRequestFullScreen"] || canvasContainer["msRequestFullscreen"] || (canvasContainer["webkitRequestFullscreen"] ? () => canvasContainer["webkitRequestFullscreen"](Element["ALLOW_KEYBOARD_INPUT"]) : null) || (canvasContainer["webkitRequestFullScreen"] ? () => canvasContainer["webkitRequestFullScreen"](Element["ALLOW_KEYBOARD_INPUT"]) : null);
+    // Safari didn't support Element.requestFullscreen until 16.4
+    // See: https://developer.mozilla.org/en-US/docs/Web/API/Element/requestFullscreen
+    /** @suppress {checkTypes} */ canvasContainer.requestFullscreen ??= (canvasContainer["webkitRequestFullscreen"] ? () => canvasContainer["webkitRequestFullscreen"](Element.ALLOW_KEYBOARD_INPUT) : null) ?? (canvasContainer["webkitRequestFullScreen"] ? () => canvasContainer["webkitRequestFullScreen"](Element.ALLOW_KEYBOARD_INPUT) : null);
     canvasContainer.requestFullscreen();
-  },
-  requestFullScreen() {
-    abort("Module.requestFullScreen has been replaced by Module.requestFullscreen (without a capital S)");
   },
   exitFullscreen() {
     // This is workaround for chrome. Trying to exit from fullscreen
-    // not in fullscreen state will cause "TypeError: Document not active"
+    // not in fullscreen state will cause 'TypeError: Document not active'
     // in chrome. See https://github.com/emscripten-core/emscripten/pull/8236
     if (!Browser.isFullscreen) {
       return false;
     }
-    var CFS = document["exitFullscreen"] || document["cancelFullScreen"] || document["mozCancelFullScreen"] || document["msExitFullscreen"] || document["webkitCancelFullScreen"] || (() => {});
+    var CFS = document.exitFullscreen ?? document["webkitCancelFullScreen"];
     CFS.apply(document, []);
     return true;
   },
@@ -4742,14 +4850,7 @@ var Browser = {
     }[name.slice(name.lastIndexOf(".") + 1)];
   },
   getUserMedia(func) {
-    window.getUserMedia ||= navigator["getUserMedia"] || navigator["mozGetUserMedia"];
-    window.getUserMedia(func);
-  },
-  getMovementX(event) {
-    return event["movementX"] || event["mozMovementX"] || event["webkitMovementX"] || 0;
-  },
-  getMovementY(event) {
-    return event["movementY"] || event["mozMovementY"] || event["webkitMovementY"] || 0;
+    return navigator.mediaDevices.getUserMedia(func);
   },
   getMouseWheelDelta(event) {
     var delta = 0;
@@ -4827,13 +4928,8 @@ var Browser = {
     if (Browser.pointerLock) {
       // When the pointer is locked, calculate the coordinates
       // based on the movement of the mouse.
-      // Workaround for Firefox bug 764498
-      if (event.type != "mousemove" && ("mozMovementX" in event)) {
-        Browser.mouseMovementX = Browser.mouseMovementY = 0;
-      } else {
-        Browser.mouseMovementX = Browser.getMovementX(event);
-        Browser.mouseMovementY = Browser.getMovementY(event);
-      }
+      Browser.mouseMovementX = event.movementX;
+      Browser.mouseMovementY = event.movementY;
       // add the mouse delta to the current absolute mouse position
       Browser.mouseX += Browser.mouseMovementX;
       Browser.mouseY += Browser.mouseMovementY;
@@ -4904,13 +5000,6 @@ var Browser = {
     }
     var w = wNative;
     var h = hNative;
-    if (Module["forcedAspectRatio"] > 0) {
-      if (w / h < Module["forcedAspectRatio"]) {
-        w = Math.round(h * Module["forcedAspectRatio"]);
-      } else {
-        h = Math.round(w / Module["forcedAspectRatio"]);
-      }
-    }
     if ((getFullscreenElement() === canvas.parentNode) && (typeof screen != "undefined")) {
       var factor = Math.min(screen.width / w, screen.height / h);
       w = Math.round(w * factor);
@@ -5069,7 +5158,7 @@ var getEmscriptenSupportedExtensions = ctx => {
   "ANGLE_instanced_arrays", "EXT_blend_minmax", "EXT_disjoint_timer_query", "EXT_frag_depth", "EXT_shader_texture_lod", "EXT_sRGB", "OES_element_index_uint", "OES_fbo_render_mipmap", "OES_standard_derivatives", "OES_texture_float", "OES_texture_half_float", "OES_texture_half_float_linear", "OES_vertex_array_object", "WEBGL_color_buffer_float", "WEBGL_depth_texture", "WEBGL_draw_buffers", // WebGL 1 and WebGL 2 extensions
   "EXT_clip_control", "EXT_color_buffer_half_float", "EXT_depth_clamp", "EXT_float_blend", "EXT_polygon_offset_clamp", "EXT_texture_compression_bptc", "EXT_texture_compression_rgtc", "EXT_texture_filter_anisotropic", "KHR_parallel_shader_compile", "OES_texture_float_linear", "WEBGL_blend_func_extended", "WEBGL_compressed_texture_astc", "WEBGL_compressed_texture_etc", "WEBGL_compressed_texture_etc1", "WEBGL_compressed_texture_s3tc", "WEBGL_compressed_texture_s3tc_srgb", "WEBGL_debug_renderer_info", "WEBGL_debug_shaders", "WEBGL_lose_context", "WEBGL_multi_draw", "WEBGL_polygon_mode" ];
   // .getSupportedExtensions() can return null if context is lost, so coerce to empty array.
-  return (ctx.getSupportedExtensions() || []).filter(ext => supportedExtensions.includes(ext));
+  return ctx.getSupportedExtensions()?.filter(ext => supportedExtensions.includes(ext)) ?? [];
 };
 
 var GL = {
@@ -5649,10 +5738,7 @@ var _eglSwapBuffers = (dpy, surface) => {
   }
   // We create the loop runner here but it is not actually running until
   // _emscripten_set_main_loop_timing is called (which might happen at a
-  // later time).  This member signifies that the current runner has not
-  // yet been started so that we can call runtimeKeepalivePush when it
-  // gets its timing set for the first time.
-  MainLoop.running = false;
+  // later time).
   MainLoop.runner = function MainLoop_runner() {
     if (ABORT) return;
     if (MainLoop.queue.length > 0) {
@@ -5711,10 +5797,9 @@ var _eglSwapBuffers = (dpy, surface) => {
 };
 
 var MainLoop = {
-  running: false,
+  func: null,
   scheduler: null,
   currentlyRunningMainloop: 0,
-  func: null,
   arg: 0,
   timingMode: 0,
   timingValue: 0,
@@ -5723,9 +5808,11 @@ var MainLoop = {
   preMainLoop: [],
   postMainLoop: [],
   pause() {
-    MainLoop.scheduler = null;
-    // Incrementing this signals the previous main loop that it's now become old, and it must return.
-    MainLoop.currentlyRunningMainloop++;
+    if (MainLoop.scheduler) {
+      MainLoop.scheduler = null;
+      // Incrementing this signals the previous main loop that it's now become old, and it must return.
+      MainLoop.currentlyRunningMainloop++;
+    }
   },
   resume() {
     MainLoop.currentlyRunningMainloop++;
@@ -5754,10 +5841,7 @@ var MainLoop = {
       }
     }
   },
-  init() {
-    Module["preMainLoop"] && MainLoop.preMainLoop.push(Module["preMainLoop"]);
-    Module["postMainLoop"] && MainLoop.postMainLoop.push(Module["postMainLoop"]);
-  },
+  init() {},
   runIter(func) {
     if (ABORT) return;
     for (var pre of MainLoop.preMainLoop) {
@@ -5775,7 +5859,7 @@ var MainLoop = {
   fakeRequestAnimationFrame(func) {
     // try to keep 60fps between calls to here
     var now = Date.now();
-    if (MainLoop.nextRAF === 0) {
+    if (!MainLoop.nextRAF) {
       MainLoop.nextRAF = now + 1e3 / 60;
     } else {
       while (now + 2 >= MainLoop.nextRAF) {
@@ -5802,9 +5886,6 @@ var _emscripten_set_main_loop_timing = (mode, value) => {
     err("emscripten_set_main_loop_timing: Cannot set timing mode for main loop since a main loop does not exist! Call emscripten_set_main_loop first to set one up.");
     return 1;
   }
-  if (!MainLoop.running) {
-    MainLoop.running = true;
-  }
   if (mode == 0) {
     MainLoop.scheduler = function MainLoop_scheduler_setTimeout() {
       var timeUntilNextTick = Math.max(0, MainLoop.tickStartTime + value - _emscripten_get_now()) | 0;
@@ -5817,16 +5898,17 @@ var _emscripten_set_main_loop_timing = (mode, value) => {
   } else {
     assert(mode == 2);
     if (!MainLoop.setImmediate) {
-      if (globalThis.setImmediate) {
+      if (globalThis.scheduler) {
+        // Some modern browsers implement scheduler.postTask, but not all.
+        MainLoop.setImmediate = scheduler.postTask.bind(scheduler);
+      } else if (globalThis.setImmediate) {
         MainLoop.setImmediate = setImmediate;
       } else {
         // Emulate setImmediate. (note: not a complete polyfill, we don't emulate clearImmediate() to keep code size to minimum, since not needed)
         var setImmediates = [];
         var emscriptenMainLoopMessageId = "setimmediate";
         /** @param {Event} event */ var MainLoop_setImmediate_messageHandler = event => {
-          // When called in current thread or Worker, the main loop ID is structured slightly different to accommodate for --proxy-to-worker runtime listening to Worker events,
-          // so check for both cases.
-          if (event.data === emscriptenMainLoopMessageId || event.data.target === emscriptenMainLoopMessageId) {
+          if (event.data === emscriptenMainLoopMessageId) {
             event.stopPropagation();
             setImmediates.shift()();
           }
@@ -5835,12 +5917,12 @@ var _emscripten_set_main_loop_timing = (mode, value) => {
         MainLoop.setImmediate = /** @type{function(function(): ?, ...?): number} */ (func => {
           setImmediates.push(func);
           if (ENVIRONMENT_IS_WORKER) {
-            Module["setImmediates"] ??= [];
-            Module["setImmediates"].push(func);
-            postMessage({
-              target: emscriptenMainLoopMessageId
-            });
-          } else postMessage(emscriptenMainLoopMessageId, "*");
+            // The postMessge API in a Worker, sends message to the main
+            // thread and does not support the `targetOrigin` (*) argument.
+            postMessage(emscriptenMainLoopMessageId);
+          } else {
+            postMessage(emscriptenMainLoopMessageId, "*");
+          }
         });
       }
     }
@@ -5954,7 +6036,7 @@ var JSEvents = {
   deferCall(targetFunction, precedence, argsList) {
     function arraysHaveEqualContent(arrA, arrB) {
       if (arrA.length != arrB.length) return false;
-      for (var i in arrA) {
+      for (var i = 0; i < arrA.length; i++) {
         if (arrA[i] != arrB[i]) return false;
       }
       return true;
@@ -5976,12 +6058,12 @@ var JSEvents = {
     JSEvents.deferredCalls = JSEvents.deferredCalls.filter(call => call.targetFunction != targetFunction);
   },
   canPerformEventHandlerRequests() {
+    // Browsers that support navigator.userActivation.isActive: https://developer.mozilla.org/en-US/docs/Web/API/UserActivation/isActive
     if (navigator.userActivation) {
       // Verify against transient activation status from UserActivation API
       // whether it is possible to perform a request here without needing to defer. See
       // https://developer.mozilla.org/en-US/docs/Web/Security/User_activation#transient_activation
       // and https://caniuse.com/mdn-api_useractivation
-      // At the time of writing, Firefox does not support this API: https://bugzil.la/1791079
       return navigator.userActivation.isActive;
     }
     return JSEvents.inEventHandler && JSEvents.currentEventHandler.allowsDeferredCalls;
@@ -6053,13 +6135,12 @@ var JSEvents = {
     return success ? 0 : -5;
   },
   getNodeNameForTarget(target) {
-    if (!target) return "";
     if (target == window) return "#window";
     if (target == screen) return "#screen";
-    return target?.nodeName || "";
+    return target?.nodeName ?? "";
   },
   fullscreenEnabled() {
-    return document.fullscreenEnabled || document.webkitFullscreenEnabled;
+    return document.fullscreenEnabled ?? document.webkitFullscreenEnabled;
   }
 };
 
@@ -6124,7 +6205,7 @@ var setCanvasElementSize = (target, width, height) => {
   }
 };
 
-var currentFullscreenStrategy = {};
+var currentFullscreenStrategy = 0;
 
 var wasmTableMirror = [];
 
@@ -6135,6 +6216,12 @@ var getWasmTableEntry = funcPtr => {
   }
   /** @suppress {checkTypes} */ assert(wasmTable.get(funcPtr) == func, "table mirror is out of date");
   return func;
+};
+
+var callCanvasResizedCallback = strategy => {
+  if (strategy.canvasResizedCallback) {
+    getWasmTableEntry(strategy.canvasResizedCallback)(37, 0, strategy.canvasResizedCallbackUserData);
+  }
 };
 
 var registerRestoreOldStyle = canvas => {
@@ -6167,7 +6254,6 @@ var registerRestoreOldStyle = canvas => {
   function restoreOldStyle() {
     if (!getFullscreenElement()) {
       document.removeEventListener("fullscreenchange", restoreOldStyle);
-      // As of Safari 13.0.3 on macOS Catalina 10.15.1 still ships with prefixed webkitfullscreenchange. TODO: revisit this check once Safari ships unprefixed version.
       document.removeEventListener("webkitfullscreenchange", restoreOldStyle);
       setCanvasElementSize(canvas, oldWidth, oldHeight);
       canvas.style.width = oldCssWidth;
@@ -6197,13 +6283,10 @@ var registerRestoreOldStyle = canvas => {
       // IE
       canvas.style.imageRendering = oldImageRendering;
       if (canvas.GLctxObject) canvas.GLctxObject.GLctx.viewport(0, 0, oldWidth, oldHeight);
-      if (currentFullscreenStrategy.canvasResizedCallback) {
-        getWasmTableEntry(currentFullscreenStrategy.canvasResizedCallback)(37, 0, currentFullscreenStrategy.canvasResizedCallbackUserData);
-      }
+      callCanvasResizedCallback(currentFullscreenStrategy);
     }
   }
   document.addEventListener("fullscreenchange", restoreOldStyle);
-  // As of Safari 13.0.3 on macOS Catalina 10.15.1 still ships with prefixed webkitfullscreenchange. TODO: revisit this check once Safari ships unprefixed version.
   document.addEventListener("webkitfullscreenchange", restoreOldStyle);
   return restoreOldStyle;
 };
@@ -6280,14 +6363,14 @@ var JSEvents_requestFullscreen = (target, strategy) => {
   if (target.requestFullscreen) {
     target.requestFullscreen();
   } else if (target.webkitRequestFullscreen) {
+    // Safari didn't Element.requestFullscreen support until 16.4
+    // See: https://developer.mozilla.org/en-US/docs/Web/API/Element/requestFullscreen
     target.webkitRequestFullscreen(Element.ALLOW_KEYBOARD_INPUT);
   } else {
     return JSEvents.fullscreenEnabled() ? -3 : -1;
   }
   currentFullscreenStrategy = strategy;
-  if (strategy.canvasResizedCallback) {
-    getWasmTableEntry(strategy.canvasResizedCallback)(37, 0, strategy.canvasResizedCallbackUserData);
-  }
+  callCanvasResizedCallback(strategy);
   return 0;
 };
 
@@ -6356,21 +6439,9 @@ var fillGamepadEventData = (eventStruct, e) => {
     HEAPF64[SAFE_HEAP_INDEX(HEAPF64, (((eventStruct + i * 8) + (16)) >> 3), "storing")] = e.axes[i];
   }
   for (var i = 0; i < e.buttons.length; ++i) {
-    if (typeof e.buttons[i] == "object") {
-      HEAPF64[SAFE_HEAP_INDEX(HEAPF64, (((eventStruct + i * 8) + (528)) >> 3), "storing")] = e.buttons[i].value;
-    } else {
-      HEAPF64[SAFE_HEAP_INDEX(HEAPF64, (((eventStruct + i * 8) + (528)) >> 3), "storing")] = e.buttons[i];
-    }
-  }
-  for (var i = 0; i < e.buttons.length; ++i) {
-    if (typeof e.buttons[i] == "object") {
-      HEAP8[SAFE_HEAP_INDEX(HEAP8, (eventStruct + i) + (1040), "storing")] = e.buttons[i].pressed;
-      checkInt8(e.buttons[i].pressed);
-    } else {
-      // Assigning a boolean to HEAP32, that's ok, but Closure would like to warn about it:
-      /** @suppress {checkTypes} */ HEAP8[SAFE_HEAP_INDEX(HEAP8, (eventStruct + i) + (1040), "storing")] = e.buttons[i] == 1;
-      checkInt8(e.buttons[i] == 1);
-    }
+    HEAP8[SAFE_HEAP_INDEX(HEAP8, (eventStruct + i) + (1040), "storing")] = e.buttons[i].pressed;
+    checkInt8(e.buttons[i].pressed);
+    HEAPF64[SAFE_HEAP_INDEX(HEAPF64, (((eventStruct + i * 8) + (528)) >> 3), "storing")] = e.buttons[i].value;
   }
   HEAP8[SAFE_HEAP_INDEX(HEAP8, (eventStruct) + (1104), "storing")] = e.connected;
   checkInt8(e.connected);
@@ -6467,9 +6538,11 @@ var _emscripten_glBufferData = (target, size, data, usage) => {
   GLctx.bufferData(target, data ? HEAPU8.subarray(data, data + size) : size, usage);
 };
 
-var _emscripten_glBufferSubData = (target, offset, size, data) => {
-  GLctx.bufferSubData(target, offset, HEAPU8.subarray(data, data + size));
+var webglBufferSubData = (target, offset, size, data, src = HEAPU8) => {
+  GLctx.bufferSubData(target, offset, src.subarray(data, data + size));
 };
+
+var _emscripten_glBufferSubData = (target, offset, size, data) => webglBufferSubData(target, offset, size, data);
 
 var _emscripten_glCheckFramebufferStatus = x0 => GLctx.checkFramebufferStatus(x0);
 
@@ -6499,11 +6572,11 @@ var _emscripten_glCompressedTexImage2D = (target, level, internalFormat, width, 
   // final data parameter, so we simply pass a heap view starting at zero
   // effectively uploading whatever happens to be near address zero.  See
   // https://github.com/emscripten-core/emscripten/issues/19300.
-  GLctx.compressedTexImage2D(target, level, internalFormat, width, height, border, HEAPU8.subarray((data), data + imageSize));
+  GLctx.compressedTexImage2D(target, level, internalFormat, width, height, border, HEAPU8.subarray(data, data + imageSize));
 };
 
 var _emscripten_glCompressedTexSubImage2D = (target, level, xoffset, yoffset, width, height, format, imageSize, data) => {
-  GLctx.compressedTexSubImage2D(target, level, xoffset, yoffset, width, height, format, HEAPU8.subarray((data), data + imageSize));
+  GLctx.compressedTexSubImage2D(target, level, xoffset, yoffset, width, height, format, HEAPU8.subarray(data, data + imageSize));
 };
 
 var _emscripten_glCopyTexImage2D = (x0, x1, x2, x3, x4, x5, x6, x7) => GLctx.copyTexImage2D(x0, x1, x2, x3, x4, x5, x6, x7);
@@ -7341,16 +7414,15 @@ var _emscripten_glGetUniformLocation = (program, name) => {
   return -1;
 };
 
-var webglGetUniformLocation = location => {
-  var p = GLctx.currentProgram;
-  if (p) {
-    var webglLoc = p.uniformLocsById[location];
-    // p.uniformLocsById[location] stores either an integer, or a
+var webglGetProgramUniformLocation = (program, location) => {
+  if (program) {
+    var webglLoc = program.uniformLocsById[location];
+    // program.uniformLocsById[location] stores either an integer, or a
     // WebGLUniformLocation.
     // If an integer, we have not yet bound the location, so do it now. The
     // integer value specifies the array index we should bind to.
     if (typeof webglLoc == "number") {
-      p.uniformLocsById[location] = webglLoc = GLctx.getUniformLocation(p, p.uniformArrayNamesById[location] + (webglLoc > 0 ? `[${webglLoc}]` : ""));
+      program.uniformLocsById[location] = webglLoc = GLctx.getUniformLocation(program, program.uniformArrayNamesById[location] + (webglLoc > 0 ? `[${webglLoc}]` : ""));
     }
     // Else an already cached WebGLUniformLocation, return it.
     return webglLoc;
@@ -7369,7 +7441,7 @@ var webglGetUniformLocation = location => {
   }
   program = GL.programs[program];
   webglPrepareUniformLocationsBeforeFirstUse(program);
-  var data = GLctx.getUniform(program, webglGetUniformLocation(location));
+  var data = GLctx.getUniform(program, webglGetProgramUniformLocation(program, location));
   if (typeof data == "number" || typeof data == "boolean") {
     switch (type) {
      case 0:
@@ -7612,7 +7684,7 @@ var heapObjectForWebGLType = type => {
 
 var toTypedArrayIndex = (pointer, heap) => pointer >>> (31 - Math.clz32(heap.BYTES_PER_ELEMENT));
 
-var emscriptenWebGLGetTexPixelData = (type, format, width, height, pixels, internalFormat) => {
+var emscriptenWebGLGetTexPixelData = (type, format, width, height, pixels) => {
   var heap = heapObjectForWebGLType(type);
   var sizePerPixel = colorChannelsInGlTextureFormat(format) * heap.BYTES_PER_ELEMENT;
   var bytes = computeUnpackAlignedImageSize(width, height, sizePerPixel);
@@ -7620,7 +7692,7 @@ var emscriptenWebGLGetTexPixelData = (type, format, width, height, pixels, inter
 };
 
 var _emscripten_glReadPixels = (x, y, width, height, format, type, pixels) => {
-  var pixelData = emscriptenWebGLGetTexPixelData(type, format, width, height, pixels, format);
+  var pixelData = emscriptenWebGLGetTexPixelData(type, format, width, height, pixels);
   if (!pixelData) {
     GL.recordError(1280);
     return;
@@ -7660,7 +7732,7 @@ var _emscripten_glStencilOp = (x0, x1, x2) => GLctx.stencilOp(x0, x1, x2);
 var _emscripten_glStencilOpSeparate = (x0, x1, x2, x3) => GLctx.stencilOpSeparate(x0, x1, x2, x3);
 
 var _emscripten_glTexImage2D = (target, level, internalFormat, width, height, border, format, type, pixels) => {
-  var pixelData = pixels ? emscriptenWebGLGetTexPixelData(type, format, width, height, pixels, internalFormat) : null;
+  var pixelData = pixels ? emscriptenWebGLGetTexPixelData(type, format, width, height, pixels) : null;
   GLctx.texImage2D(target, level, internalFormat, width, height, border, format, type, pixelData);
 };
 
@@ -7679,9 +7751,11 @@ var _emscripten_glTexParameteriv = (target, pname, params) => {
 };
 
 var _emscripten_glTexSubImage2D = (target, level, xoffset, yoffset, width, height, format, type, pixels) => {
-  var pixelData = pixels ? emscriptenWebGLGetTexPixelData(type, format, width, height, pixels, 0) : null;
+  var pixelData = pixels ? emscriptenWebGLGetTexPixelData(type, format, width, height, pixels) : null;
   GLctx.texSubImage2D(target, level, xoffset, yoffset, width, height, format, type, pixelData);
 };
+
+var webglGetUniformLocation = location => webglGetProgramUniformLocation(GLctx.currentProgram, location);
 
 var _emscripten_glUniform1f = (location, v0) => {
   GLctx.uniform1f(webglGetUniformLocation(location), v0);
@@ -8142,7 +8216,7 @@ var registerFocusEventCallback = (target, userData, useCapture, callbackfunc, ev
   JSEvents.focusEvent ||= _malloc(eventSize);
   var focusEventHandlerFunc = e => {
     var nodeName = JSEvents.getNodeNameForTarget(e.target);
-    var id = e.target.id ? e.target.id : "";
+    var id = e.target.id ?? "";
     var focusEvent = JSEvents.focusEvent;
     stringToUTF8(nodeName, focusEvent + 0, 128);
     stringToUTF8(id, focusEvent + 128, 128);
@@ -8184,13 +8258,13 @@ var fillFullscreenChangeEventData = eventStruct => {
   // If transitioning to windowed mode, report info about the element that just was fullscreen.
   var reportedElement = isFullscreen ? fullscreenElement : JSEvents.previousFullscreenElement;
   var nodeName = JSEvents.getNodeNameForTarget(reportedElement);
-  var id = reportedElement?.id || "";
+  var id = reportedElement?.id ?? "";
   stringToUTF8(nodeName, eventStruct + 2, 128);
   stringToUTF8(id, eventStruct + 130, 128);
-  HEAP32[SAFE_HEAP_INDEX(HEAP32, (((eventStruct) + (260)) >> 2), "storing")] = reportedElement ? reportedElement.clientWidth : 0;
-  checkInt32(reportedElement ? reportedElement.clientWidth : 0);
-  HEAP32[SAFE_HEAP_INDEX(HEAP32, (((eventStruct) + (264)) >> 2), "storing")] = reportedElement ? reportedElement.clientHeight : 0;
-  checkInt32(reportedElement ? reportedElement.clientHeight : 0);
+  HEAP32[SAFE_HEAP_INDEX(HEAP32, (((eventStruct) + (260)) >> 2), "storing")] = reportedElement?.clientWidth ?? 0;
+  checkInt32(reportedElement?.clientWidth ?? 0);
+  HEAP32[SAFE_HEAP_INDEX(HEAP32, (((eventStruct) + (264)) >> 2), "storing")] = reportedElement?.clientHeight ?? 0;
+  checkInt32(reportedElement?.clientHeight ?? 0);
   HEAP32[SAFE_HEAP_INDEX(HEAP32, (((eventStruct) + (268)) >> 2), "storing")] = screen.width;
   checkInt32(screen.width);
   HEAP32[SAFE_HEAP_INDEX(HEAP32, (((eventStruct) + (272)) >> 2), "storing")] = screen.height;
@@ -8224,7 +8298,6 @@ var _emscripten_set_fullscreenchange_callback_on_thread = (target, userData, use
   if (!JSEvents.fullscreenEnabled()) return -1;
   target = findEventTarget(target);
   if (!target) return -4;
-  // As of Safari 13.0.3 on macOS Catalina 10.15.1 still ships with prefixed webkitfullscreenchange. TODO: revisit this check once Safari ships unprefixed version.
   // TODO: When this block is removed, also change test/test_html5_remove_event_listener.c test expectation on emscripten_set_fullscreenchange_callback().
   registerFullscreenChangeEventCallback(target, userData, useCapture, callbackfunc, 19, "webkitfullscreenchange", targetThread);
   return registerFullscreenChangeEventCallback(target, userData, useCapture, callbackfunc, 19, "fullscreenchange", targetThread);
@@ -8278,10 +8351,10 @@ var registerKeyEventCallback = (target, userData, useCapture, callbackfunc, even
     HEAP32[SAFE_HEAP_INDEX(HEAP32, idx + 5, "storing")] = e.charCode;
     HEAP32[SAFE_HEAP_INDEX(HEAP32, idx + 6, "storing")] = e.keyCode;
     HEAP32[SAFE_HEAP_INDEX(HEAP32, idx + 7, "storing")] = e.which;
-    stringToUTF8(e.key || "", keyEventData + 32, 32);
-    stringToUTF8(e.code || "", keyEventData + 64, 32);
-    stringToUTF8(e.char || "", keyEventData + 96, 32);
-    stringToUTF8(e.locale || "", keyEventData + 128, 32);
+    stringToUTF8(e.key ?? "", keyEventData + 32, 32);
+    stringToUTF8(e.code ?? "", keyEventData + 64, 32);
+    stringToUTF8(e.char ?? "", keyEventData + 96, 32);
+    stringToUTF8(e.locale ?? "", keyEventData + 128, 32);
     if (getWasmTableEntry(callbackfunc)(eventTypeId, keyEventData, userData)) e.preventDefault();
   };
   var eventHandler = {
@@ -8321,8 +8394,8 @@ var fillMouseEventData = (eventStruct, e, target) => {
   HEAP8[SAFE_HEAP_INDEX(HEAP8, eventStruct + 27, "storing")] = e.metaKey;
   HEAP16[SAFE_HEAP_INDEX(HEAP16, idx * 2 + 14, "storing")] = e.button;
   HEAP16[SAFE_HEAP_INDEX(HEAP16, idx * 2 + 15, "storing")] = e.buttons;
-  HEAP32[SAFE_HEAP_INDEX(HEAP32, idx + 8, "storing")] = e["movementX"];
-  HEAP32[SAFE_HEAP_INDEX(HEAP32, idx + 9, "storing")] = e["movementY"];
+  HEAP32[SAFE_HEAP_INDEX(HEAP32, idx + 8, "storing")] = e.movementX;
+  HEAP32[SAFE_HEAP_INDEX(HEAP32, idx + 9, "storing")] = e.movementY;
   // Note: rect contains doubles (truncated to placate SAFE_HEAP, which is the same behaviour when writing to HEAP32 anyway)
   var rect = getBoundingClientRect(target);
   HEAP32[SAFE_HEAP_INDEX(HEAP32, idx + 10, "storing")] = e.clientX - (rect.left | 0);
@@ -8369,7 +8442,7 @@ var fillPointerlockChangeEventData = eventStruct => {
   /** @suppress{checkTypes} */ HEAP8[SAFE_HEAP_INDEX(HEAP8, eventStruct, "storing")] = isPointerlocked;
   checkInt8(isPointerlocked);
   var nodeName = JSEvents.getNodeNameForTarget(pointerLockElement);
-  var id = pointerLockElement?.id || "";
+  var id = pointerLockElement?.id ?? "";
   stringToUTF8(nodeName, eventStruct + 1, 128);
   stringToUTF8(id, eventStruct + 129, 128);
 };
@@ -8618,7 +8691,7 @@ var _emscripten_sleep = () => {
 
 var ENV = {};
 
-var getExecutableName = () => thisProgram || "./this.program";
+var getExecutableName = () => thisProgram;
 
 var getEnvStrings = () => {
   if (!getEnvStrings.strings) {
@@ -8691,7 +8764,17 @@ function _fd_close(fd) {
     var ptr = HEAPU32[SAFE_HEAP_INDEX(HEAPU32, ((iov) >> 2), "loading")];
     var len = HEAPU32[SAFE_HEAP_INDEX(HEAPU32, (((iov) + (4)) >> 2), "loading")];
     iov += 8;
-    var curr = FS.read(stream, HEAP8, ptr, len, offset);
+    try {
+      var curr = FS.read(stream, HEAP8, ptr, len, offset);
+    } catch (e) {
+      // On a non-blocking stream a subsequent read may would-block after we
+      // already gathered data. POSIX readv is a single gather-read: return
+      // what we have rather than failing the whole call.
+      if (ret > 0 && e instanceof FS.ErrnoError && (e.errno == 6 || e.errno == 6)) {
+        break;
+      }
+      throw e;
+    }
     if (curr < 0) return -1;
     ret += curr;
     if (curr < len) break;
@@ -8724,7 +8807,7 @@ function _fd_seek(fd, offset, whence, newOffset) {
     FS.llseek(stream, offset, whence);
     HEAP64[SAFE_HEAP_INDEX(HEAP64, ((newOffset) >> 3), "storing")] = BigInt(stream.position);
     checkInt64(stream.position);
-    if (stream.getdents && offset === 0 && whence === 0) stream.getdents = null;
+    if (stream.getdents && !offset && whence === 0) stream.getdents = null;
     // reset readdir state
     return 0;
   } catch (e) {
@@ -8734,23 +8817,27 @@ function _fd_seek(fd, offset, whence, newOffset) {
 }
 
 /** @param {number=} offset */ var doWritev = (stream, iov, iovcnt, offset) => {
-  var ret = 0;
-  for (var i = 0; i < iovcnt; i++) {
+  // Gather all iovecs into one contiguous buffer and issue a single
+  // FS.write, matching POSIX writev's single gather-write semantics (as
+  // __syscall_sendmsg already does). Per-iovec writes fragment a stream
+  // socket send into multiple segments, breaking stream byte semantics.
+  if (iovcnt == 1) {
+    // Single iovec: write directly from HEAP8, no gather buffer needed.
+    return FS.write(stream, HEAP8, HEAPU32[SAFE_HEAP_INDEX(HEAPU32, ((iov) >> 2), "loading")], HEAPU32[SAFE_HEAP_INDEX(HEAPU32, (((iov) + (4)) >> 2), "loading")], offset);
+  }
+  var total = 0;
+  for (var i = 0, p = iov; i < iovcnt; i++, p += 8) {
+    total += HEAPU32[SAFE_HEAP_INDEX(HEAPU32, (((p) + (4)) >> 2), "loading")];
+  }
+  var view = new Uint8Array(total);
+  var voff = 0;
+  for (var i = 0; i < iovcnt; i++, iov += 8) {
     var ptr = HEAPU32[SAFE_HEAP_INDEX(HEAPU32, ((iov) >> 2), "loading")];
     var len = HEAPU32[SAFE_HEAP_INDEX(HEAPU32, (((iov) + (4)) >> 2), "loading")];
-    iov += 8;
-    var curr = FS.write(stream, HEAP8, ptr, len, offset);
-    if (curr < 0) return -1;
-    ret += curr;
-    if (curr < len) {
-      // No more space to write.
-      break;
-    }
-    if (typeof offset != "undefined") {
-      offset += curr;
-    }
+    view.set(HEAPU8.subarray(ptr, ptr + len), voff);
+    voff += len;
   }
-  return ret;
+  return FS.write(stream, view, 0, total, offset);
 };
 
 function _fd_write(fd, iov, iovcnt, pnum) {
@@ -8839,13 +8926,11 @@ for (/**@suppress{duplicate}*/ var i = 0; i <= 288; ++i) {
 {
   // Begin ATMODULES hooks
   if (Module["noExitRuntime"]) noExitRuntime = Module["noExitRuntime"];
-  if (Module["preloadPlugins"]) preloadPlugins = Module["preloadPlugins"];
   if (Module["print"]) out = Module["print"];
   if (Module["printErr"]) err = Module["printErr"];
-  if (Module["wasmBinary"]) wasmBinary = Module["wasmBinary"];
   // End ATMODULES hooks
   checkIncomingModuleAPI();
-  if (Module["arguments"]) arguments_ = Module["arguments"];
+  if (Module["arguments"]) programArgs = Module["arguments"];
   if (Module["thisProgram"]) thisProgram = Module["thisProgram"];
   // Assertions on removed incoming Module JS APIs.
   assert(typeof Module["memoryInitializerPrefixURL"] == "undefined", "Module.memoryInitializerPrefixURL option was removed, use Module.locateFile instead");
@@ -8862,10 +8947,13 @@ for (/**@suppress{duplicate}*/ var i = 0; i <= 288; ++i) {
   // If memory is defined in wasm, the user can't provide it, or set INITIAL_MEMORY
   assert(typeof Module["wasmMemory"] == "undefined", "Use of `wasmMemory` detected.  Use -sIMPORTED_MEMORY to define wasmMemory externally");
   assert(typeof Module["INITIAL_MEMORY"] == "undefined", "Detected runtime INITIAL_MEMORY setting.  Use -sIMPORTED_MEMORY to define wasmMemory dynamically");
-  if (Module["preInit"]) {
-    if (typeof Module["preInit"] == "function") Module["preInit"] = [ Module["preInit"] ];
-    while (Module["preInit"].length > 0) {
-      Module["preInit"].shift()();
+  var preInit = Module["preInit"];
+  if (preInit) {
+    if (typeof preInit == "function") Module["preInit"] = preInit = [ preInit ];
+    // Written as a loop so that preInit functions that themselves add more
+    // preInit functions.  Is this actually needed?
+    while (preInit.length > 0) {
+      preInit.shift()();
     }
   }
   consumedModuleProp("preInit");
@@ -8892,11 +8980,11 @@ Module["FS_createDataFile"] = FS_createDataFile;
 
 Module["FS_createLazyFile"] = FS_createLazyFile;
 
-var missingLibrarySymbols = [ "writeI53ToI64Clamped", "writeI53ToI64Signaling", "writeI53ToU64Clamped", "writeI53ToU64Signaling", "convertI32PairToI53", "convertI32PairToI53Checked", "convertU32PairToI53", "getTempRet0", "createNamedFunction", "zeroMemory", "withStackSave", "inetPton4", "inetNtop4", "inetPton6", "inetNtop6", "readSockaddr", "writeSockaddr", "getDynCaller", "runtimeKeepalivePush", "runtimeKeepalivePop", "asmjsMangle", "HandleAllocator", "addOnInit", "addOnPostCtor", "addOnPreMain", "STACK_SIZE", "STACK_ALIGN", "POINTER_SIZE", "ASSERTIONS", "ccall", "cwrap", "convertJsFunctionToWasm", "getEmptyTableSlot", "updateTableMap", "getFunctionAddress", "addFunction", "removeFunction", "intArrayToString", "AsciiToString", "stringToAscii", "UTF16ToString", "stringToUTF16", "lengthBytesUTF16", "UTF32ToString", "stringToUTF32", "lengthBytesUTF32", "writeArrayToMemory", "fillDeviceOrientationEventData", "registerDeviceOrientationEventCallback", "fillDeviceMotionEventData", "registerDeviceMotionEventCallback", "screenOrientation", "fillOrientationChangeEventData", "registerOrientationChangeEventCallback", "hideEverythingExceptGivenElement", "restoreHiddenElements", "softFullscreenResizeWebGLRenderTarget", "registerPointerlockErrorEventCallback", "fillBatteryEventData", "registerBatteryEventCallback", "convertPCtoSourceLocation", "wasiRightsToMuslOFlags", "wasiOFlagsToMuslOFlags", "setImmediateWrapped", "safeRequestAnimationFrame", "clearImmediateWrapped", "registerPostMainLoop", "registerPreMainLoop", "getPromise", "makePromise", "idsToPromises", "makePromiseCallback", "incrementUncaughtExceptionCount", "decrementUncaughtExceptionCount", "Browser_asyncPrepareDataCounter", "isLeapYear", "ydayFromDate", "arraySum", "addDays", "getSocketFromFD", "getSocketAddress", "FS_mkdirTree", "_setNetworkCallback", "writeGLArray", "registerWebGlEventCallback", "runAndAbortIfError", "ALLOC_NORMAL", "ALLOC_STACK", "allocate", "writeStringToMemory", "writeAsciiToMemory", "allocateUTF8", "allocateUTF8OnStack", "demangle", "stackTrace", "getNativeTypeSize" ];
+var missingLibrarySymbols = [ "writeI53ToI64Clamped", "writeI53ToI64Signaling", "writeI53ToU64Clamped", "writeI53ToU64Signaling", "convertI32PairToI53", "convertI32PairToI53Checked", "convertU32PairToI53", "getTempRet0", "createNamedFunction", "zeroMemory", "withStackSave", "inetPton4", "inetNtop4", "inetPton6", "inetNtop6", "readSockaddr", "writeSockaddr", "getDynCaller", "runtimeKeepalivePush", "runtimeKeepalivePop", "asmjsMangle", "HandleAllocator", "addOnInit", "addOnPostCtor", "addOnPreMain", "STACK_SIZE", "STACK_ALIGN", "POINTER_SIZE", "ASSERTIONS", "ccall", "cwrap", "convertJsFunctionToWasm", "getEmptyTableSlot", "updateTableMap", "getFunctionAddress", "addFunction", "removeFunction", "intArrayToString", "AsciiToString", "stringToAscii", "UTF16ToString", "stringToUTF16", "lengthBytesUTF16", "UTF32ToString", "stringToUTF32", "lengthBytesUTF32", "writeArrayToMemory", "fillDeviceOrientationEventData", "registerDeviceOrientationEventCallback", "fillDeviceMotionEventData", "registerDeviceMotionEventCallback", "screenOrientation", "fillOrientationChangeEventData", "registerOrientationChangeEventCallback", "hideEverythingExceptGivenElement", "restoreHiddenElements", "softFullscreenResizeWebGLRenderTarget", "registerPointerlockErrorEventCallback", "fillBatteryEventData", "registerBatteryEventCallback", "convertPCtoSourceLocation", "wasiRightsToMuslOFlags", "wasiOFlagsToMuslOFlags", "setImmediateWrapped", "safeRequestAnimationFrame", "clearImmediateWrapped", "registerPostMainLoop", "registerPreMainLoop", "getPromise", "makePromise", "addPromise", "idsToPromises", "makePromiseCallback", "incrementUncaughtExceptionCount", "decrementUncaughtExceptionCount", "Browser_asyncPrepareDataCounter", "isLeapYear", "ydayFromDate", "arraySum", "addDays", "getSocketFromFD", "getSocketAddress", "FS_mkdirTree", "_setNetworkCallback", "writeGLArray", "registerWebGlEventCallback", "runAndAbortIfError", "writeStringToMemory", "writeAsciiToMemory", "allocateUTF8", "allocateUTF8OnStack", "demangle", "stackTrace", "getNativeTypeSize" ];
 
 missingLibrarySymbols.forEach(missingLibrarySymbol);
 
-var unexportedSymbols = [ "run", "out", "err", "callMain", "abort", "wasmExports", "writeStackCookie", "checkStackCookie", "writeI53ToI64", "readI53FromI64", "readI53FromU64", "INT53_MAX", "INT53_MIN", "bigintToI53Checked", "HEAP8", "HEAPU8", "HEAP16", "HEAPU16", "HEAP32", "HEAPU32", "HEAPF32", "HEAPF64", "HEAP64", "HEAPU64", "stackSave", "stackRestore", "stackAlloc", "setTempRet0", "ptrToString", "exitJS", "getHeapMax", "growMemory", "ENV", "setStackLimits", "ERRNO_CODES", "strError", "DNS", "Protocols", "Sockets", "timers", "warnOnce", "readEmAsmArgsArray", "readEmAsmArgs", "runEmAsmFunction", "runMainThreadEmAsm", "jstoi_q", "getExecutableName", "autoResumeAudioContext", "dynCall", "handleException", "keepRuntimeAlive", "callUserCallback", "maybeExit", "asyncLoad", "alignMemory", "mmapAlloc", "wasmTable", "wasmMemory", "getUniqueRunDependency", "noExitRuntime", "addOnPreRun", "addOnExit", "addOnPostRun", "freeTableIndexes", "functionsInTableMap", "setValue", "getValue", "PATH", "PATH_FS", "UTF8Decoder", "UTF8ArrayToString", "UTF8ToString", "stringToUTF8Array", "stringToUTF8", "lengthBytesUTF8", "intArrayFromString", "UTF16Decoder", "stringToNewUTF8", "stringToUTF8OnStack", "JSEvents", "registerKeyEventCallback", "specialHTMLTargets", "maybeCStringToJsString", "findEventTarget", "findCanvasEventTarget", "getBoundingClientRect", "fillMouseEventData", "registerMouseEventCallback", "registerWheelEventCallback", "registerUiEventCallback", "registerFocusEventCallback", "fillFullscreenChangeEventData", "registerFullscreenChangeEventCallback", "JSEvents_requestFullscreen", "JSEvents_resizeCanvasForFullscreen", "registerRestoreOldStyle", "setLetterbox", "currentFullscreenStrategy", "restoreOldWindowedStyle", "doRequestFullscreen", "fillPointerlockChangeEventData", "registerPointerlockChangeEventCallback", "requestPointerLock", "fillVisibilityChangeEventData", "registerVisibilityChangeEventCallback", "registerTouchEventCallback", "fillGamepadEventData", "registerGamepadEventCallback", "registerBeforeUnloadEventCallback", "setCanvasElementSize", "getCanvasElementSize", "jsStackTrace", "getCallstack", "UNWIND_CACHE", "ExitStatus", "getEnvStrings", "checkWasiClock", "doReadv", "doWritev", "initRandomFill", "randomFill", "safeSetTimeout", "emSetImmediate", "emClearImmediate_deps", "emClearImmediate", "promiseMap", "uncaughtExceptionCount", "exceptionLast", "exceptionCaught", "ExceptionInfo", "findMatchingCatch", "getExceptionMessageCommon", "incrementExceptionRefcount", "decrementExceptionRefcount", "getExceptionMessage", "Browser", "requestFullScreen", "setCanvasSize", "getUserMedia", "getPreloadedImageData__data", "wget", "MONTH_DAYS_REGULAR", "MONTH_DAYS_LEAP", "MONTH_DAYS_REGULAR_CUMULATIVE", "MONTH_DAYS_LEAP_CUMULATIVE", "SYSCALLS", "preloadPlugins", "FS_createPreloadedFile", "FS_modeStringToFlags", "FS_getMode", "FS_fileDataToTypedArray", "FS_stdin_getChar_buffer", "FS_stdin_getChar", "FS_readFile", "FS", "FS_root", "FS_mounts", "FS_devices", "FS_streams", "FS_nextInode", "FS_nameTable", "FS_currentPath", "FS_initialized", "FS_ignorePermissions", "FS_filesystems", "FS_syncFSRequests", "FS_lookupPath", "FS_getPath", "FS_hashName", "FS_hashAddNode", "FS_hashRemoveNode", "FS_lookupNode", "FS_createNode", "FS_destroyNode", "FS_isRoot", "FS_isMountpoint", "FS_isFile", "FS_isDir", "FS_isLink", "FS_isChrdev", "FS_isBlkdev", "FS_isFIFO", "FS_isSocket", "FS_flagsToPermissionString", "FS_nodePermissions", "FS_mayLookup", "FS_mayCreate", "FS_mayDelete", "FS_mayOpen", "FS_checkOpExists", "FS_nextfd", "FS_getStreamChecked", "FS_getStream", "FS_createStream", "FS_closeStream", "FS_dupStream", "FS_doSetAttr", "FS_chrdev_stream_ops", "FS_major", "FS_minor", "FS_makedev", "FS_registerDevice", "FS_getDevice", "FS_getMounts", "FS_syncfs", "FS_mount", "FS_unmount", "FS_lookup", "FS_mknod", "FS_statfs", "FS_statfsStream", "FS_statfsNode", "FS_create", "FS_mkdir", "FS_mkdev", "FS_symlink", "FS_rename", "FS_rmdir", "FS_readdir", "FS_readlink", "FS_stat", "FS_fstat", "FS_lstat", "FS_doChmod", "FS_chmod", "FS_lchmod", "FS_fchmod", "FS_doChown", "FS_chown", "FS_lchown", "FS_fchown", "FS_doTruncate", "FS_truncate", "FS_ftruncate", "FS_utime", "FS_open", "FS_close", "FS_isClosed", "FS_llseek", "FS_read", "FS_write", "FS_mmap", "FS_msync", "FS_ioctl", "FS_writeFile", "FS_cwd", "FS_chdir", "FS_createDefaultDirectories", "FS_createDefaultDevices", "FS_createSpecialDirectories", "FS_createStandardStreams", "FS_staticInit", "FS_init", "FS_quit", "FS_findObject", "FS_analyzePath", "FS_createFile", "FS_forceLoadFile", "MEMFS", "TTY", "PIPEFS", "SOCKFS", "tempFixedLengthArray", "miniTempWebGLFloatBuffers", "miniTempWebGLIntBuffers", "heapObjectForWebGLType", "toTypedArrayIndex", "webgl_enable_ANGLE_instanced_arrays", "webgl_enable_OES_vertex_array_object", "webgl_enable_WEBGL_draw_buffers", "webgl_enable_WEBGL_multi_draw", "webgl_enable_EXT_polygon_offset_clamp", "webgl_enable_EXT_clip_control", "webgl_enable_WEBGL_polygon_mode", "GL", "emscriptenWebGLGet", "computeUnpackAlignedImageSize", "colorChannelsInGlTextureFormat", "emscriptenWebGLGetTexPixelData", "emscriptenWebGLGetUniform", "webglGetUniformLocation", "webglPrepareUniformLocationsBeforeFirstUse", "webglGetLeftBracePos", "emscriptenWebGLGetVertexAttrib", "__glGetActiveAttribOrUniform", "AL", "GLUT", "EGL", "GLEW", "IDBStore", "print", "printErr", "jstoi_s" ];
+var unexportedSymbols = [ "run", "out", "err", "callMain", "abort", "wasmExports", "writeStackCookie", "checkStackCookie", "writeI53ToI64", "readI53FromI64", "readI53FromU64", "INT53_MAX", "INT53_MIN", "bigintToI53Checked", "HEAP8", "HEAPU8", "HEAP16", "HEAPU16", "HEAP32", "HEAPU32", "HEAPF32", "HEAPF64", "HEAP64", "HEAPU64", "stackSave", "stackRestore", "stackAlloc", "setTempRet0", "ptrToString", "exitJS", "getHeapMax", "growMemory", "ENV", "setStackLimits", "ERRNO_CODES", "strError", "DNS", "Protocols", "Sockets", "timers", "warnOnce", "readEmAsmArgsArray", "readEmAsmArgs", "runEmAsmFunction", "runMainThreadEmAsm", "jstoi_q", "getExecutableName", "autoResumeAudioContext", "dynCall", "handleException", "keepRuntimeAlive", "callUserCallback", "maybeExit", "asyncLoad", "alignMemory", "mmapAlloc", "wasmTable", "wasmMemory", "getUniqueRunDependency", "noExitRuntime", "addOnPreRun", "addOnExit", "addOnPostRun", "freeTableIndexes", "functionsInTableMap", "setValue", "getValue", "PATH", "PATH_FS", "UTF8Decoder", "UTF8ArrayToString", "UTF8ToString", "stringToUTF8Array", "stringToUTF8", "lengthBytesUTF8", "intArrayFromString", "UTF16Decoder", "stringToNewUTF8", "stringToUTF8OnStack", "JSEvents", "registerKeyEventCallback", "specialHTMLTargets", "maybeCStringToJsString", "findEventTarget", "findCanvasEventTarget", "getBoundingClientRect", "fillMouseEventData", "registerMouseEventCallback", "registerWheelEventCallback", "registerUiEventCallback", "registerFocusEventCallback", "fillFullscreenChangeEventData", "registerFullscreenChangeEventCallback", "callCanvasResizedCallback", "JSEvents_requestFullscreen", "JSEvents_resizeCanvasForFullscreen", "registerRestoreOldStyle", "setLetterbox", "currentFullscreenStrategy", "restoreOldWindowedStyle", "doRequestFullscreen", "fillPointerlockChangeEventData", "registerPointerlockChangeEventCallback", "requestPointerLock", "fillVisibilityChangeEventData", "registerVisibilityChangeEventCallback", "registerTouchEventCallback", "fillGamepadEventData", "registerGamepadEventCallback", "registerBeforeUnloadEventCallback", "setCanvasElementSize", "getCanvasElementSize", "jsStackTrace", "getCallstack", "UNWIND_CACHE", "ExitStatus", "getEnvStrings", "checkWasiClock", "doReadv", "doWritev", "initRandomFill", "randomFill", "safeSetTimeout", "emSetImmediate", "emClearImmediate_deps", "emClearImmediate", "promiseMap", "uncaughtExceptionCount", "exceptionLast", "exceptionCaught", "ExceptionInfo", "findMatchingCatch", "getExceptionMessageCommon", "incrementExceptionRefcount", "decrementExceptionRefcount", "getExceptionMessage", "Browser", "setCanvasSize", "getUserMedia", "getPreloadedImageData__data", "wget", "MONTH_DAYS_REGULAR", "MONTH_DAYS_LEAP", "MONTH_DAYS_REGULAR_CUMULATIVE", "MONTH_DAYS_LEAP_CUMULATIVE", "SYSCALLS", "preloadPlugins", "FS_createPreloadedFile", "FS_modeStringToFlags", "FS_getMode", "FS_fileDataToTypedArray", "FS_stdin_getChar_buffer", "FS_stdin_getChar", "FS_readFile", "FS", "FS_root", "FS_mounts", "FS_devices", "FS_streams", "FS_nextInode", "FS_nameTable", "FS_currentPath", "FS_initialized", "FS_ignorePermissions", "FS_filesystems", "FS_syncFSRequests", "FS_lookupPath", "FS_getPath", "FS_hashName", "FS_hashAddNode", "FS_hashRemoveNode", "FS_lookupNode", "FS_createNode", "FS_destroyNode", "FS_isRoot", "FS_isMountpoint", "FS_isFile", "FS_isDir", "FS_isLink", "FS_isChrdev", "FS_isBlkdev", "FS_isFIFO", "FS_isSocket", "FS_flagsToPermissionString", "FS_nodePermissions", "FS_mayLookup", "FS_mayCreate", "FS_mayDelete", "FS_mayOpen", "FS_checkOpExists", "FS_nextfd", "FS_getStreamChecked", "FS_getStream", "FS_createStream", "FS_closeStream", "FS_dupStream", "FS_doSetAttr", "FS_chrdev_stream_ops", "FS_major", "FS_minor", "FS_makedev", "FS_registerDevice", "FS_getDevice", "FS_getMounts", "FS_syncfs", "FS_mount", "FS_unmount", "FS_lookup", "FS_mknod", "FS_statfs", "FS_statfsStream", "FS_statfsNode", "FS_create", "FS_mkdir", "FS_mkdev", "FS_symlink", "FS_link", "FS_rename", "FS_rmdir", "FS_readdir", "FS_readlink", "FS_stat", "FS_fstat", "FS_lstat", "FS_doChmod", "FS_chmod", "FS_lchmod", "FS_fchmod", "FS_doChown", "FS_chown", "FS_lchown", "FS_fchown", "FS_doTruncate", "FS_truncate", "FS_ftruncate", "FS_utime", "FS_open", "FS_close", "FS_isClosed", "FS_llseek", "FS_read", "FS_write", "FS_mmap", "FS_msync", "FS_ioctl", "FS_writeFile", "FS_cwd", "FS_chdir", "FS_createDefaultDirectories", "FS_createDefaultDevices", "FS_createSpecialDirectories", "FS_createStandardStreams", "FS_staticInit", "FS_init", "FS_quit", "FS_findObject", "FS_analyzePath", "FS_createFile", "FS_forceLoadFile", "MEMFS", "TTY", "PIPEFS", "SOCKFS", "tempFixedLengthArray", "miniTempWebGLFloatBuffers", "miniTempWebGLIntBuffers", "heapObjectForWebGLType", "toTypedArrayIndex", "webgl_enable_ANGLE_instanced_arrays", "webgl_enable_OES_vertex_array_object", "webgl_enable_WEBGL_draw_buffers", "webgl_enable_WEBGL_multi_draw", "webgl_enable_EXT_polygon_offset_clamp", "webgl_enable_EXT_clip_control", "webgl_enable_WEBGL_polygon_mode", "GL", "emscriptenWebGLGet", "computeUnpackAlignedImageSize", "colorChannelsInGlTextureFormat", "emscriptenWebGLGetTexPixelData", "emscriptenWebGLGetUniform", "webglGetProgramUniformLocation", "webglGetUniformLocation", "webglPrepareUniformLocationsBeforeFirstUse", "webglGetLeftBracePos", "emscriptenWebGLGetVertexAttrib", "__glGetActiveAttribOrUniform", "AL", "GLUT", "EGL", "GLEW", "IDBStore", "print", "printErr", "jstoi_s" ];
 
 unexportedSymbols.forEach(unexportedRuntimeSymbol);
 
@@ -8912,10 +9000,30 @@ function checkIncomingModuleAPI() {
   ignoredModuleProp("onRealloc");
   ignoredModuleProp("onFree");
   ignoredModuleProp("onSbrkGrow");
+  ignoredModuleProp("onCOSCacheHit");
+  ignoredModuleProp("onCOSCacheMiss");
+  ignoredModuleProp("onCOSStore");
+  ignoredModuleProp("GL_MAX_TEXTURE_IMAGE_UNITS");
+  ignoredModuleProp("SDL_canPlayWithWebAudio");
+  ignoredModuleProp("SDL_numSimultaneouslyQueuedBuffers");
+  ignoredModuleProp("freePreloadedMediaOnUse");
+  ignoredModuleProp("preinitializedWebGLContext");
+  ignoredModuleProp("keyboardListeningElement");
+  ignoredModuleProp("doNotCaptureKeyboard");
+  ignoredModuleProp("extraStackTrace");
+  ignoredModuleProp("preloadPlugins");
+  ignoredModuleProp("preMainLoop");
+  ignoredModuleProp("postMainLoop");
+  ignoredModuleProp("forcedAspectRatio");
+  ignoredModuleProp("mainScriptUrlOrBlob");
+  ignoredModuleProp("onFullScreen");
+  ignoredModuleProp("INITIAL_MEMORY");
+  ignoredModuleProp("wasmMemory");
+  ignoredModuleProp("wasmBinary");
 }
 
 var ASM_CONSTS = {
-  160508: $0 => {
+  160460: $0 => {
     var str = UTF8ToString($0) + "\n\n" + "Abort/Retry/Ignore/AlwaysIgnore? [ariA] :";
     var reply = window.prompt(str, "i");
     if (reply === null) {
@@ -8923,7 +9031,7 @@ var ASM_CONSTS = {
     }
     return reply.length === 1 ? reply.charCodeAt(0) : -1;
   },
-  160723: () => {
+  160675: () => {
     if (typeof (AudioContext) !== "undefined") {
       return true;
     } else if (typeof (webkitAudioContext) !== "undefined") {
@@ -8931,7 +9039,7 @@ var ASM_CONSTS = {
     }
     return false;
   },
-  160870: () => {
+  160822: () => {
     if ((typeof (navigator.mediaDevices) !== "undefined") && (typeof (navigator.mediaDevices.getUserMedia) !== "undefined")) {
       return true;
     } else if (typeof (navigator.webkitGetUserMedia) !== "undefined") {
@@ -8939,7 +9047,7 @@ var ASM_CONSTS = {
     }
     return false;
   },
-  161104: $0 => {
+  161056: $0 => {
     if (typeof (Module["SDL2"]) === "undefined") {
       Module["SDL2"] = {};
     }
@@ -8963,11 +9071,11 @@ var ASM_CONSTS = {
     }
     return SDL2.audioContext === undefined ? -1 : 0;
   },
-  161656: () => {
+  161608: () => {
     var SDL2 = Module["SDL2"];
     return SDL2.audioContext.sampleRate;
   },
-  161724: ($0, $1, $2, $3) => {
+  161676: ($0, $1, $2, $3) => {
     var SDL2 = Module["SDL2"];
     var have_microphone = function(stream) {
       if (SDL2.capture.silenceTimer !== undefined) {
@@ -9009,7 +9117,7 @@ var ASM_CONSTS = {
       }, have_microphone, no_microphone);
     }
   },
-  163417: ($0, $1, $2, $3) => {
+  163369: ($0, $1, $2, $3) => {
     var SDL2 = Module["SDL2"];
     SDL2.audio.scriptProcessorNode = SDL2.audioContext["createScriptProcessor"]($1, 0, $0);
     SDL2.audio.scriptProcessorNode["onaudioprocess"] = function(e) {
@@ -9041,7 +9149,7 @@ var ASM_CONSTS = {
       SDL2.audio.silenceTimer = setInterval(silence_callback, ($1 / SDL2.audioContext.sampleRate) * 1e3);
     }
   },
-  164592: ($0, $1) => {
+  164544: ($0, $1) => {
     var SDL2 = Module["SDL2"];
     var numChannels = SDL2.capture.currentCaptureBuffer.numberOfChannels;
     for (var c = 0; c < numChannels; ++c) {
@@ -9060,7 +9168,7 @@ var ASM_CONSTS = {
       }
     }
   },
-  165197: ($0, $1) => {
+  165149: ($0, $1) => {
     var SDL2 = Module["SDL2"];
     var buf = $0 >>> 2;
     var numChannels = SDL2.audio.currentOutputBuffer["numberOfChannels"];
@@ -9074,7 +9182,7 @@ var ASM_CONSTS = {
       }
     }
   },
-  165686: $0 => {
+  165638: $0 => {
     var SDL2 = Module["SDL2"];
     if ($0) {
       if (SDL2.capture.silenceTimer !== undefined) {
@@ -9108,7 +9216,7 @@ var ASM_CONSTS = {
       SDL2.audioContext = undefined;
     }
   },
-  166692: ($0, $1, $2) => {
+  166644: ($0, $1, $2) => {
     var w = $0;
     var h = $1;
     var pixels = $2;
@@ -9179,7 +9287,7 @@ var ASM_CONSTS = {
     }
     SDL2.ctx.putImageData(SDL2.image, 0, 0);
   },
-  168158: ($0, $1, $2, $3, $4) => {
+  168110: ($0, $1, $2, $3, $4) => {
     var w = $0;
     var h = $1;
     var hot_x = $2;
@@ -9216,18 +9324,18 @@ var ASM_CONSTS = {
     stringToUTF8(url, urlBuf, url.length + 1);
     return urlBuf;
   },
-  169146: $0 => {
+  169098: $0 => {
     if (Module["canvas"]) {
       Module["canvas"].style["cursor"] = UTF8ToString($0);
     }
   },
-  169229: () => {
+  169181: () => {
     if (Module["canvas"]) {
       Module["canvas"].style["cursor"] = "none";
     }
   },
-  169298: () => window.innerWidth,
-  169328: () => window.innerHeight
+  169250: () => window.innerWidth,
+  169280: () => window.innerHeight
 };
 
 // Imports from the Wasm binary.
@@ -9311,29 +9419,29 @@ function assignWasmExports(wasmExports) {
   assert(typeof wasmExports["__set_stack_limits"] != "undefined", "missing Wasm export: __set_stack_limits");
   assert(typeof wasmExports["memory"] != "undefined", "missing Wasm export: memory");
   assert(typeof wasmExports["__indirect_function_table"] != "undefined", "missing Wasm export: __indirect_function_table");
-  _malloc = createExportWrapper("malloc", 1);
-  _free = createExportWrapper("free", 1);
-  _fflush = createExportWrapper("fflush", 1);
-  _strerror = createExportWrapper("strerror", 1);
-  _main = Module["_main"] = createExportWrapper("main", 2);
-  _fileno = createExportWrapper("fileno", 1);
+  _malloc = createExportWrapper("malloc", wasmExports["malloc"], 1);
+  _free = createExportWrapper("free", wasmExports["free"], 1);
+  _fflush = createExportWrapper("fflush", wasmExports["fflush"], 1);
+  _strerror = createExportWrapper("strerror", wasmExports["strerror"], 1);
+  _main = Module["_main"] = createExportWrapper("main", wasmExports["main"], 2);
+  _fileno = createExportWrapper("fileno", wasmExports["fileno"], 1);
   _emscripten_stack_get_end = wasmExports["emscripten_stack_get_end"];
   _emscripten_stack_get_base = wasmExports["emscripten_stack_get_base"];
-  _sbrk = createExportWrapper("sbrk", 1);
+  _sbrk = createExportWrapper("sbrk", wasmExports["sbrk"], 1);
   _emscripten_get_sbrk_ptr = wasmExports["emscripten_get_sbrk_ptr"];
-  _setThrew = createExportWrapper("setThrew", 2);
-  __emscripten_tempret_set = createExportWrapper("_emscripten_tempret_set", 1);
+  _setThrew = createExportWrapper("setThrew", wasmExports["setThrew"], 2);
+  __emscripten_tempret_set = createExportWrapper("_emscripten_tempret_set", wasmExports["_emscripten_tempret_set"], 1);
   _emscripten_stack_init = wasmExports["emscripten_stack_init"];
   _emscripten_stack_get_free = wasmExports["emscripten_stack_get_free"];
   __emscripten_stack_restore = wasmExports["_emscripten_stack_restore"];
   __emscripten_stack_alloc = wasmExports["_emscripten_stack_alloc"];
   _emscripten_stack_get_current = wasmExports["emscripten_stack_get_current"];
-  ___cxa_decrement_exception_refcount = createExportWrapper("__cxa_decrement_exception_refcount", 1);
-  ___cxa_increment_exception_refcount = createExportWrapper("__cxa_increment_exception_refcount", 1);
-  ___get_exception_message = createExportWrapper("__get_exception_message", 3);
-  ___cxa_can_catch = createExportWrapper("__cxa_can_catch", 3);
-  ___cxa_get_exception_ptr = createExportWrapper("__cxa_get_exception_ptr", 1);
-  ___set_stack_limits = Module["___set_stack_limits"] = createExportWrapper("__set_stack_limits", 2);
+  ___cxa_decrement_exception_refcount = createExportWrapper("__cxa_decrement_exception_refcount", wasmExports["__cxa_decrement_exception_refcount"], 1);
+  ___cxa_increment_exception_refcount = createExportWrapper("__cxa_increment_exception_refcount", wasmExports["__cxa_increment_exception_refcount"], 1);
+  ___get_exception_message = createExportWrapper("__get_exception_message", wasmExports["__get_exception_message"], 3);
+  ___cxa_can_catch = createExportWrapper("__cxa_can_catch", wasmExports["__cxa_can_catch"], 3);
+  ___cxa_get_exception_ptr = createExportWrapper("__cxa_get_exception_ptr", wasmExports["__cxa_get_exception_ptr"], 1);
+  ___set_stack_limits = Module["___set_stack_limits"] = createExportWrapper("__set_stack_limits", wasmExports["__set_stack_limits"], 2);
   memory = wasmMemory = wasmExports["memory"];
   __indirect_function_table = wasmTable = wasmExports["__indirect_function_table"];
 }
@@ -9605,10 +9713,8 @@ var wasmImports = {
   /** @export */ invoke_iiiiii,
   /** @export */ invoke_iiiiiii,
   /** @export */ invoke_iiiiiiii,
-  /** @export */ invoke_iiiiiiiiiii,
   /** @export */ invoke_iiiiiiiiiiii,
   /** @export */ invoke_iiiiiiiiiiiii,
-  /** @export */ invoke_jiiii,
   /** @export */ invoke_v,
   /** @export */ invoke_vi,
   /** @export */ invoke_vii,
@@ -9774,29 +9880,6 @@ function invoke_v(index) {
   }
 }
 
-function invoke_iiiiiiiiiii(index, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10) {
-  var sp = stackSave();
-  try {
-    return getWasmTableEntry(index)(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10);
-  } catch (e) {
-    stackRestore(sp);
-    if (!(e instanceof EmscriptenEH)) throw e;
-    _setThrew(1, 0);
-  }
-}
-
-function invoke_jiiii(index, a1, a2, a3, a4) {
-  var sp = stackSave();
-  try {
-    return getWasmTableEntry(index)(a1, a2, a3, a4);
-  } catch (e) {
-    stackRestore(sp);
-    if (!(e instanceof EmscriptenEH)) throw e;
-    _setThrew(1, 0);
-    return 0n;
-  }
-}
-
 function invoke_iiiiiiiiiiiii(index, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12) {
   var sp = stackSave();
   try {
@@ -9903,43 +9986,30 @@ function stackCheckInit() {
   writeStackCookie();
 }
 
-function run() {
-  if (runDependencies > 0) {
-    dependenciesFulfilled = run;
-    return;
-  }
+async function run() {
+  assert(!calledRun);
+  calledRun = true;
   stackCheckInit();
   preRun();
-  // a preRun added a dependency, run will be called later
-  if (runDependencies > 0) {
-    dependenciesFulfilled = run;
-    return;
+  if (runDependencies) {
+    await resolveRunDependencies();
   }
-  function doRun() {
-    // run may have just been called through dependencies being fulfilled just in this very frame,
-    // or while the async setStatus time below was happening
-    assert(!calledRun);
-    calledRun = true;
-    Module["calledRun"] = true;
-    if (ABORT) return;
-    initRuntime();
-    preMain();
-    Module["onRuntimeInitialized"]?.();
-    consumedModuleProp("onRuntimeInitialized");
-    var noInitialRun = Module["noInitialRun"] || false;
-    if (!noInitialRun) callMain();
-    postRun();
+  var setStatus = Module["setStatus"];
+  if (setStatus) {
+    setStatus("Running...");
+    // Yield to the event loop to allow the browser to paint "Running..."
+    await new Promise(resolve => setTimeout(resolve, 1));
+    // Then we want to clear the status text, but only after the rest of this function runs.
+    setTimeout(setStatus, 1, "");
   }
-  if (Module["setStatus"]) {
-    Module["setStatus"]("Running...");
-    setTimeout(() => {
-      setTimeout(() => Module["setStatus"](""), 1);
-      doRun();
-    }, 1);
-  } else {
-    doRun();
-  }
-  checkStackCookie();
+  if (ABORT) return;
+  initRuntime();
+  // No ATMAINS hooks
+  Module["onRuntimeInitialized"]?.();
+  consumedModuleProp("onRuntimeInitialized");
+  var noInitialRun = Module["noInitialRun"] || false;
+  if (!noInitialRun) callMain();
+  postRun();
 }
 
 function checkUnflushedContent() {
@@ -9986,6 +10056,4 @@ var wasmExports;
 
 // With async instantation wasmExports is assigned asynchronously when the
 // instance is received.
-createWasm();
-
-run();
+createWasm().then(() => run());

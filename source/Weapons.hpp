@@ -10,7 +10,11 @@ class Weapon{
     Sprite* owner;
     SDL_Texture* body;
     SDL_Texture* arm;
+    float arm_w,arm_h;
     SDL_Texture* head;
+    float head_w,head_h;
+    Vec2f Arm_Offset;
+    Vec2f Head_Offset;
     Vec2f Arm_MovingOffset;
     Vec2f Head_MovingOffset;
     Vec2f ArmCenter;
@@ -27,11 +31,16 @@ class Weapon{
         std::function<void(Weapon*,float)> update):
             owner(owner),onUse(onUse),onAltUse(onAltUse),reload(reload),draw(draw),update(update){
                 //temporary decision
-                body=SDL_CreateTexture(renderer,SDL_PIXELFORMAT_RGBA8888,SDL_TEXTUREACCESS_TARGET,owner->rect.w,owner->rect.h);
+                head_w=5;
+                head_h=5;
+                arm_w=10;
+                arm_h=2;
+                body=SDL_CreateTexture(renderer,SDL_PIXELFORMAT_RGBA8888,SDL_TEXTUREACCESS_TARGET,owner->rect.w,owner->rect.h-arm_h);
                 arm=SDL_CreateTexture(renderer,SDL_PIXELFORMAT_RGBA8888,SDL_TEXTUREACCESS_TARGET
-                    ,10,10);
+                    ,arm_w,arm_h);
                 head=SDL_CreateTexture(renderer,SDL_PIXELFORMAT_RGBA8888,SDL_TEXTUREACCESS_TARGET
-                    ,5,5);
+                    ,head_w,head_h);
+                Arm_Offset={0,-25};
                 SDL_Texture* prev=SDL_GetRenderTarget(renderer);
                 SDL_SetRenderTarget(renderer,body);
                 SDL_SetRenderDrawColor(renderer,255,0,0,0);
@@ -47,26 +56,33 @@ class Weapon{
     virtual ~Weapon()=default;
     //In development
     void _Draw(){
+        SDL_FRect drect={owner->rect.x+Arm_Offset.x,owner->rect.y+Arm_Offset.y,arm_w,arm_h};
+        SDL_FRect ddrect={owner->rect.x+Head_Offset.x,owner->rect.y+Head_Offset.y,head_w,head_h};
         SDL_RenderCopyF(renderer,body,NULL,&owner->rect);
         float angle=std::atan2(owner->pointingTo.y-(owner->rect.y+owner->rect.h/2.f),
                 owner->pointingTo.x-(owner->rect.x+owner->rect.w/2.f))*180.f/3.14159f;
         SDL_FPoint p={ArmCenter.x,ArmCenter.y};
+        SDL_FPoint pp={HeadCenter.x,HeadCenter.y};
         if (owner->dx==0.f){
-            SDL_RenderCopyExF(renderer,arm,NULL,&owner->rect,angle,&p,SDL_FLIP_NONE);
+            SDL_RenderCopyExF(renderer,head,NULL,&ddrect,angle,&p,SDL_FLIP_NONE);
+            SDL_RenderCopyExF(renderer,arm,NULL,&drect,angle,&pp,SDL_FLIP_NONE);
         }
         if (owner->dx<0.f){
-            SDL_FRect rect={owner->rect.x-Arm_MovingOffset.x,owner->rect.y-Arm_MovingOffset.y,owner->rect.w,owner->rect.h};
+            SDL_FRect rect={owner->rect.x-Arm_MovingOffset.x,owner->rect.y-Arm_MovingOffset.y,arm_w,arm_h};
             SDL_RenderCopyExF(renderer,arm,NULL,&rect,angle,&p,SDL_FLIP_NONE);
+            SDL_FRect r={owner->rect.x-Head_MovingOffset.x,owner->rect.y-Head_MovingOffset.y,head_w,head_h};
+            SDL_RenderCopyExF(renderer,head,NULL,&r,angle,&p,SDL_FLIP_NONE);
         }
         if (owner->dx>0.f){
-            SDL_FRect rect={owner->rect.x+Arm_MovingOffset.x,owner->rect.y+Arm_MovingOffset.y,owner->rect.w,owner->rect.h};
+            SDL_FRect rect={owner->rect.x+Arm_MovingOffset.x,owner->rect.y+Arm_MovingOffset.y,arm_w,arm_h};
             SDL_RenderCopyExF(renderer,arm,NULL,&rect,angle,&p,SDL_FLIP_NONE);
+            SDL_FRect r={owner->rect.x+Arm_MovingOffset.x,owner->rect.y+Arm_MovingOffset.y,head_w,head_h};
+            SDL_RenderCopyExF(renderer,head,NULL,&rect,angle,&p,SDL_FLIP_NONE);
         }
     }
     void Use(){
         onUse(this);
     }
-    [[deprecated("Dont call this one pls, implement render through angle and body and arm texture")]]
     void Draw(){
         _Draw();
     }
