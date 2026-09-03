@@ -9,6 +9,7 @@ class Weapon{
     public:
     Sprite* owner;
     SDL_Texture* body;
+    float body_w,body_h;
     SDL_Texture* arm;
     float arm_w,arm_h;
     SDL_Texture* head;
@@ -31,15 +32,14 @@ class Weapon{
         std::function<void(Weapon*,float)> update):
             owner(owner),onUse(onUse),onAltUse(onAltUse),reload(reload),draw(draw),update(update){
                 //temporary decision
-                head_w=5;
-                head_h=5;
-                arm_w=10;
-                arm_h=2;
                 body=SDL_CreateTexture(renderer,SDL_PIXELFORMAT_RGBA8888,SDL_TEXTUREACCESS_TARGET,owner->rect.w,owner->rect.h-arm_h);
                 arm=SDL_CreateTexture(renderer,SDL_PIXELFORMAT_RGBA8888,SDL_TEXTUREACCESS_TARGET
                     ,arm_w,arm_h);
                 head=SDL_CreateTexture(renderer,SDL_PIXELFORMAT_RGBA8888,SDL_TEXTUREACCESS_TARGET
                     ,head_w,head_h);
+                SDL_QueryTexture(body,NULL,NULL,&body_w,&body_h);
+                SDL_QueryTexture(arm,NULL,NULL,&arm_w,&arm_h);
+                SDL_QueryTexture(head,NULL,NULL,&head_w,&head_h);
                 Arm_Offset={0,-25};
                 SDL_Texture* prev=SDL_GetRenderTarget(renderer);
                 SDL_SetRenderTarget(renderer,body);
