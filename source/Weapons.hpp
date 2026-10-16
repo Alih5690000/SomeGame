@@ -9,11 +9,11 @@ class Weapon{
     public:
     Sprite* owner;
     SDL_Texture* body;
-    float body_w,body_h;
+    int body_w=100,body_h=100;
     SDL_Texture* arm;
-    float arm_w,arm_h;
+    int arm_w=150,arm_h=25;
     SDL_Texture* head;
-    float head_w,head_h;
+    int head_w=25,head_h=25;
     Vec2f Arm_Offset;
     Vec2f Head_Offset;
     Vec2f Arm_MovingOffset;
@@ -56,8 +56,8 @@ class Weapon{
     virtual ~Weapon()=default;
     //In development
     void _Draw(){
-        SDL_FRect drect={owner->rect.x+Arm_Offset.x,owner->rect.y+Arm_Offset.y,arm_w,arm_h};
-        SDL_FRect ddrect={owner->rect.x+Head_Offset.x,owner->rect.y+Head_Offset.y,head_w,head_h};
+        SDL_FRect drect={owner->rect.x+Arm_Offset.x,owner->rect.y+Arm_Offset.y,(float)arm_w,(float)arm_h};
+        SDL_FRect ddrect={owner->rect.x+Head_Offset.x,owner->rect.y+Head_Offset.y,(float)head_w,(float)head_h};
         SDL_RenderCopyF(renderer,body,NULL,&owner->rect);
         float angle=std::atan2(owner->pointingTo.y-(owner->rect.y+owner->rect.h/2.f),
                 owner->pointingTo.x-(owner->rect.x+owner->rect.w/2.f))*180.f/3.14159f;
@@ -68,15 +68,15 @@ class Weapon{
             SDL_RenderCopyExF(renderer,arm,NULL,&drect,angle,&pp,SDL_FLIP_NONE);
         }
         if (owner->dx<0.f){
-            SDL_FRect rect={owner->rect.x-Arm_MovingOffset.x,owner->rect.y-Arm_MovingOffset.y,arm_w,arm_h};
+            SDL_FRect rect={owner->rect.x-Arm_MovingOffset.x,owner->rect.y-Arm_MovingOffset.y,(float)arm_w,(float)arm_h};
             SDL_RenderCopyExF(renderer,arm,NULL,&rect,angle,&p,SDL_FLIP_NONE);
-            SDL_FRect r={owner->rect.x-Head_MovingOffset.x,owner->rect.y-Head_MovingOffset.y,head_w,head_h};
+            SDL_FRect r={owner->rect.x-Head_MovingOffset.x,owner->rect.y-Head_MovingOffset.y,(float)head_w,(float)head_h};
             SDL_RenderCopyExF(renderer,head,NULL,&r,angle,&p,SDL_FLIP_NONE);
         }
         if (owner->dx>0.f){
-            SDL_FRect rect={owner->rect.x+Arm_MovingOffset.x,owner->rect.y+Arm_MovingOffset.y,arm_w,arm_h};
+            SDL_FRect rect={owner->rect.x+Arm_MovingOffset.x,owner->rect.y+Arm_MovingOffset.y,(float)arm_w,(float)arm_h};
             SDL_RenderCopyExF(renderer,arm,NULL,&rect,angle,&p,SDL_FLIP_NONE);
-            SDL_FRect r={owner->rect.x+Arm_MovingOffset.x,owner->rect.y+Arm_MovingOffset.y,head_w,head_h};
+            SDL_FRect r={owner->rect.x+Arm_MovingOffset.x,owner->rect.y+Arm_MovingOffset.y,(float)head_w,(float)head_h};
             SDL_RenderCopyExF(renderer,head,NULL,&rect,angle,&p,SDL_FLIP_NONE);
         }
     }
